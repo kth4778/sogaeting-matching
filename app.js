@@ -10,13 +10,13 @@ const MUTUAL_MIN = 60;      // 좋아요를 받았을 때 상대도 좋아요를
 
 const $ = sel => document.querySelector(sel);
 const byId = id => PROFILES.find(p => p.id === id);
-const PHOTO_V = 3; // 사진을 새로 만들면 올려서 브라우저에 남은 옛 사진을 쓰지 않게 한다
-const photo = p => `photos/${p.id}.png?v=${PHOTO_V}`;
+const PHOTO_V = 4; // 사진을 새로 만들면 올려서 브라우저에 남은 옛 사진을 쓰지 않게 한다
+const photo = p => `photos/${p.id}.jpg?v=${PHOTO_V}`;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 내 사진이 있으면(예시 프로필) 사진, 없으면 이름 첫 글자로 동그라미를 그린다
 const meAvatar = (me, cls) => me.photo
-  ? `<div class="${cls} photo" style="background-image:url(${me.photo}?v=${PHOTO_V})"></div>`
+  ? `<div class="${cls} photo" style="background-image:url(${me.photo.replace(".png", ".jpg")}?v=${PHOTO_V})"></div>`
   : `<div class="${cls}">${esc(me.name.slice(0, 1))}</div>`;
 // 마지막 글자 받침에 따라 을/를을 고른다
 const eulReul = name => ((name.charCodeAt(name.length - 1) - 0xac00) % 28 ? `${name}을` : `${name}를`);
@@ -462,9 +462,9 @@ function showMatch(p) {
 }
 
 // ---------- 채팅 ----------
-// 내가 보낸 메시지는 바로 화면에 쌓고, 5초 동안 더 보내지 않으면 그동안 보낸 것을 묶어서 상대에게 넘긴다.
+// 내가 보낸 메시지는 바로 상대에게 넘긴다. 답장을 기다리는 동안 보낸 메시지는 모아 두었다가 답장 직후 한 번에 넘긴다.
 // 상대가 답장을 쓰는 중에도 계속 보낼 수 있다.
-const CHAT_IDLE_MS = 5000;
+const CHAT_IDLE_MS = 0; // 보내면 바로 넘긴다 (답장 대기 중에 보낸 것은 답장 직후 이어서 보냄)
 const chatRuntime = {}; // 대화방 id -> { timer, inflight, lastSentAt }
 
 function queueMessage(text) {
@@ -503,7 +503,7 @@ async function flushChat(id) {
 
   rt.inflight = true;
   render();
-  logSub(`├─ ${CHAT_IDLE_MS / 1000}초 동안 추가 입력이 없어 메시지 ${count}개를 묶어서 보냄`, "dim");
+  if (count > 1) logSub(`├─ 답장을 기다리는 동안 보낸 메시지 ${count}개를 묶어서 보냄`, "dim");
   const answeredUpTo = history.length;
   try {
     const res = await api("/api/chat", { me: state.me, partner: p, history: history.slice(0, answeredUpTo) });
@@ -525,7 +525,7 @@ async function flushChat(id) {
   rt.inflight = false;
   save("chats", state.chats);
   render();
-  // 답장을 기다리는 동안 더 보낸 메시지가 있으면 다시 5초를 기다렸다 보낸다
+  // 답장을 기다리는 동안 더 보낸 메시지가 있으면 바로 이어서 보낸다
   if (!state.ended[id] && unanswered(history)) scheduleFlush(id);
 }
 
