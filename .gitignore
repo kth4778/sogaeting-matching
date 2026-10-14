@@ -5,3 +5,4 @@ generated-images/
 image-jobs*.json
 photo-jobs*.json
 .DS_Store
+*.log

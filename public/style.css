@@ -317,8 +317,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .parrow { color: #4a4b50; font-size: 18px; }
 
 /* 단계 시작 박스: 무엇을, 왜 */
-.stage-box { margin: 14px 0 8px; padding: 12px 14px; border-radius: 12px; background: #26272b; border-left: 3px solid; font-family: "Pretendard", sans-serif; }
-.stage-box.s1 { border-color: #2f6fd6; } .stage-box.s2 { border-color: #1f9a62; } .stage-box.s3 { border-color: #d9a21b; } .stage-box.s4 { border-color: #8b5cf6; }
+.stage-box { margin: 14px 0 8px; padding: 12px 14px; border-radius: 12px; background: #26272b; font-family: "Pretendard", sans-serif; }
 .stage-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; color: #fff; }
 .stage-title .tag { padding: 1px 8px; border-radius: 4px; font-size: 12px; color: #fff; }
 .stage-title .ts { margin-left: auto; font-size: 12px; font-weight: 400; color: #6c6d72; font-family: ui-monospace, Menlo, monospace; }
@@ -492,3 +491,34 @@ body { background: radial-gradient(1200px 700px at 20% 10%, #f7e9ec 0%, transpar
 .sheet-danger { background: #ff3b30; color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.4); }
 .sheet-cancel { background: rgba(120, 120, 128, .14); }
 @keyframes sheetUp { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* 예시 프로필 고르기 */
+.ob-top-title { flex: 1; text-align: center; font-weight: 600; font-size: 16px; }
+.gender-seg { margin-bottom: 16px; }
+.gender-seg button { display: flex; align-items: center; justify-content: center; gap: 6px; height: 50px; }
+.gender-seg img { width: 30px; height: 30px; object-fit: contain; mix-blend-mode: multiply; }
+.sample-list { display: flex; flex-direction: column; gap: 10px; }
+.sample { display: flex; align-items: center; gap: 14px; padding: 12px; border-radius: 22px; text-align: left;
+  background: var(--glass-fill); box-shadow: var(--glass-edge), 0 6px 18px rgba(0,0,0,.06); transition: transform .15s ease, box-shadow .2s ease; animation: fadeUp .35s ease both; }
+.sample:nth-child(2) { animation-delay: .05s; } .sample:nth-child(3) { animation-delay: .1s; }
+.sample:hover { box-shadow: var(--glass-edge), 0 10px 26px rgba(232, 84, 107, .16); }
+.sample:active { transform: scale(.98); }
+.sample-photo { width: 76px; height: 96px; border-radius: 16px; background: #eee center/cover no-repeat; flex-shrink: 0; }
+.sample-info { flex: 1; min-width: 0; }
+.sample-info b { font-size: 17px; }
+.sample-info b span { font-weight: 400; color: var(--sub); }
+.sample-info small { display: block; font-size: 12px; color: var(--sub); margin: 3px 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sample-info .chip { font-size: 11px; padding: 4px 9px; margin: 0 3px 4px 0; }
+.chev { font-size: 24px; color: #c7c7cc; }
+
+/* 상대가 입력 중: 점 세 개 */
+.bubble.typing { display: flex; gap: 4px; padding: 13px 14px; }
+.bubble.typing i { width: 7px; height: 7px; border-radius: 50%; background: #a1a1a6; animation: typingDot 1.2s infinite; }
+.bubble.typing i:nth-child(2) { animation-delay: .15s; } .bubble.typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes typingDot { 0%, 60%, 100% { transform: none; opacity: .5; } 30% { transform: translateY(-4px); opacity: 1; } }
+
+/* 상대가 입력 중: 점 세 개 */
+.bubble.typing { display: flex; gap: 4px; padding: 13px 14px; }
+.bubble.typing i { width: 7px; height: 7px; border-radius: 50%; background: #a1a1a6; animation: typingDot 1.2s infinite; }
+.bubble.typing i:nth-child(2) { animation-delay: .15s; } .bubble.typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes typingDot { 0%, 60%, 100% { transform: none; opacity: .5; } 30% { transform: translateY(-4px); opacity: 1; } }
