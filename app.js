@@ -775,6 +775,7 @@ function render() {
     lastTab = `${state.tab}/${state.chatWith}`;
   }
   document.querySelector(".log-toggle").classList.toggle("live", state.running);
+  document.querySelector(".sheet-grip").classList.toggle("live", state.running);
   document.querySelectorAll("[data-act^='tab:']").forEach(b => b.classList.toggle("active", b.dataset.act === `tab:${state.tab}`));
   $("#tabbar").hidden = !!state.ob || (state.tab === "chats" && !!state.chatWith);
 
@@ -1000,6 +1001,38 @@ document.addEventListener("submit", e => {
   if (text) queueMessage(text);
 });
 
+// 모바일 로그 시트: 손잡이(또는 위쪽 막대)를 끌어 올리면 열리고, 끌어내리면 닫힌다
+function bindLogSheet() {
+  const sheet = $(".console");
+  const handles = [$(".sheet-grip"), $(".console-bar")];
+  let startY = 0, dy = 0, dragging = false, wasOpen = false;
+  const height = () => sheet.getBoundingClientRect().height;
+  handles.forEach(h => h.addEventListener("pointerdown", e => {
+    if (!MOBILE.matches || e.target.closest("button")) return;
+    dragging = true; startY = e.clientY; dy = 0;
+    wasOpen = document.body.classList.contains("log-open");
+    sheet.style.transition = "none";
+    h.setPointerCapture(e.pointerId);
+  }));
+  handles.forEach(h => h.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    dy = e.clientY - startY;
+    const closedY = height() - 34; // 닫혔을 때도 손잡이 34px는 보인다
+    const y = Math.min(closedY, Math.max(0, (wasOpen ? 0 : closedY) + dy));
+    sheet.style.transform = `translateY(${y}px)`;
+  }));
+  handles.forEach(h => h.addEventListener("pointerup", () => {
+    if (!dragging) return;
+    dragging = false;
+    sheet.style.transition = "";
+    sheet.style.transform = "";
+    // 조금만 움직였으면 눌렀다고 보고 열고 닫기를 바꾼다
+    const open = Math.abs(dy) < 8 ? !wasOpen : dy < 0 ? true : dy > 60 ? false : wasOpen;
+    document.body.classList.toggle("log-open", open);
+    if (open) scrollLog();
+  }));
+}
+
 // 화면 높이에 맞춰 아이폰 크기 조절
 const MOBILE = window.matchMedia("(max-width: 760px)");
 function fitPhone() {
@@ -1019,6 +1052,7 @@ function showSplash() {
 }
 
 fitPhone();
+bindLogSheet();
 bootLog();
 renderPipeline();
 render();
