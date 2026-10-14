@@ -164,3 +164,6 @@ export const SAMPLE_PROFILES = [
     personality: "장난기 많고 호기심이 많아요.",
     wants: { gender: "남", ageMin: 21, ageMax: 26, nonSmokerOnly: false, religion: "상관없음" } },
 ];
+
+// 임베딩에 넣는 프로필 문장. 앱과 미리 계산 스크립트(scripts/precompute-vectors.mjs)가 같은 문장을 써야 미리 계산한 좌표를 그대로 쓸 수 있다.
+export const profileText = p => `관심사: ${p.interests.join(", ")}. ${p.intro} ${p.personality}`;
