@@ -1,4 +1,4 @@
-// Claude 호출 3개(재순위, 이유 설명, 채팅). 로컬 서버(server.js)와 Cloudflare Worker(worker.js)가 함께 쓴다.
+// Claude 호출 3개(재순위, 이유 설명, 채팅). 로컬 서버(local-server.js)와 Vercel 함수(api/)가 함께 쓴다.
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";

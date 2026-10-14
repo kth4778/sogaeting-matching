@@ -83,7 +83,7 @@ function logTree(lines, cls = "") {
 
 function bootLog() {
   logEl.innerHTML = "";
-  logCmd(`<b>$</b> node server.js`);
+  logCmd(`<b>$</b> npm start`);
   logCmd(`> 매칭 로그 대기 중... 아이폰에서 「매칭 시작」을 누르세요 <span class="cursor"></span>`);
   logGap();
 }
