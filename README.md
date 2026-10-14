@@ -25,8 +25,17 @@ npm start
 
 http://localhost:3000 을 엽니다.
 
-## GitHub Pages 배포판
+## 배포 (Vercel, 카드 등록 없음)
 
-Pages에는 서버가 없어서 API 키를 숨길 곳이 없습니다. 그래서 배포판에서는 1·2단계와 카드 넘기기까지만 동작하고, 3·4단계와 채팅은 안내 문구와 함께 임베딩 순위로 대신 보여 줍니다. 전체 기능은 로컬 실행으로 확인하세요.
+화면(`public/`)과 Claude 중계 함수(`api/`)를 한 주소에 올린다. API 키는 Vercel 환경 변수에만 두고 브라우저로 내려보내지 않는다.
 
-인물 사진 20명과 예시 프로필 2명은 모두 AI로 만든 가상 인물입니다.
+1. vercel.com 에서 GitHub 계정으로 로그인
+2. Add New → Project → 이 저장소 Import
+3. Environment Variables 에 `ANTHROPIC_API_KEY` 추가
+4. Deploy
+
+남용을 막으려고 IP당 분당 요청 수, 요청 크기, 대화 길이에 상한을 둔다. Anthropic 콘솔에서 월 사용 한도도 걸어 두는 것을 권한다.
+
+GitHub Pages 배포판(`gh-pages` 브랜치)은 `public/config.js`의 `PAGES_API_BASE`에 Vercel 주소를 넣으면 같은 서버로 Claude를 부른다.
+
+인물 사진 20명과 예시 프로필 6명은 모두 AI로 만든 가상 인물이다.

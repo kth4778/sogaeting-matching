@@ -1,3 +1,5 @@
+import { SAMPLE_PROFILES } from "./profiles.js";
+
 // 처음 시작할 때 한 화면에 질문 하나씩 묻는 가입 흐름.
 // 여기서 모은 칸이 그대로 매칭 로직의 입력(내 프로필 + 이상형 조건)이 된다.
 
@@ -30,13 +32,13 @@ export const STEPS = [
   { key: "welcome" },
   { key: "name", title: "이름을 알려주세요", sub: "상대에게 보여질 이름이에요.", valid: d => d.name.trim().length > 0 },
   { key: "gender", title: "성별을 골라주세요", sub: "만나고 싶은 사람의 성별도 함께요.", valid: d => d.gender && d.wants.gender },
-  { key: "body", title: "나이와 키", sub: "나이는 이상형 조건과 양쪽으로 맞춰 봐요.", valid: () => true },
+  { key: "body", title: "나이와 키", sub: "상대의 이상형 조건과도 맞춰 봐요.", valid: () => true },
   { key: "place", title: "어디서 지내요?", sub: "가까운 사람끼리 만나기 편해요.", valid: d => d.job.trim().length > 0 },
-  { key: "life", title: "생활 습관", sub: "규칙 거르기에서 서로 확인하는 항목이에요.", valid: () => true },
+  { key: "life", title: "생활 습관", sub: "서로 꼭 맞아야 하는 조건이에요.", valid: () => true },
   { key: "mbti", title: "MBTI", sub: "모르면 가까운 쪽을 골라도 괜찮아요.", valid: () => true },
-  { key: "interests", title: "관심사를 골라주세요", sub: `${INTEREST_MIN}~${INTEREST_MAX}개. 임베딩이 뜻이 비슷한 사람을 찾아요.`,
+  { key: "interests", title: "관심사를 골라주세요", sub: `${INTEREST_MIN}~${INTEREST_MAX}개. 취향이 비슷한 사람을 찾는 데 써요.`,
     valid: d => d.interests.length >= INTEREST_MIN && d.interests.length <= INTEREST_MAX },
-  { key: "about", title: "나를 소개해 주세요", sub: "LLM이 이 문장을 읽고 성격까지 비교해요.", valid: d => d.intro.trim().length >= 10 && d.personality.trim().length >= 5 },
+  { key: "about", title: "나를 소개해 주세요", sub: "성격이 잘 맞는 사람을 찾는 데 써요.", valid: d => d.intro.trim().length >= 10 && d.personality.trim().length >= 5 },
   { key: "wants", title: "이런 사람이면 좋겠어요", sub: "여기서 정한 조건에 안 맞으면 후보에서 빠져요.", valid: d => d.wants.ageMin <= d.wants.ageMax },
   { key: "done" },
 ];
@@ -114,31 +116,53 @@ export function onboardingHtml(ob) {
   const { stepIndex, draft: d, editing, dir } = ob;
   const step = STEPS[stepIndex];
 
-  if (step.key === "welcome") {
+  if (ob.picker) {
+    const list = SAMPLE_PROFILES.map((p, i) => ({ p, i })).filter(x => x.p.gender === ob.picker);
     return `
-      <div class="ob welcome enter-${dir}">
-        <div class="welcome-art"><span class="pen">오늘,<br>누구와?</span></div>
-        <h2>마음이 통하는 한 사람,<br>이유까지 알려드릴게요</h2>
-        <p>규칙 · 임베딩 · LLM 세 가지로 고르고<br>왜 골랐는지 숨기지 않아요.</p>
-        <div class="ob-foot">
-          <button class="btn" data-act="ob-next">내 프로필 만들기</button>
-          <p class="quick-label">또는 예시 프로필로 바로 체험</p>
-          <div class="quick-row">
-            <button class="quick" data-act="ob-sample:남"><span class="qphoto" style="background-image:url(photos/me-m.png)"></span>남자로 시작</button>
-            <button class="quick" data-act="ob-sample:여"><span class="qphoto" style="background-image:url(photos/me-f.png)"></span>여자로 시작</button>
+      <div class="ob">
+        <div class="ob-top"><button class="icon-btn" data-act="ob-pick-close" aria-label="뒤로">←</button><span class="ob-top-title">예시 프로필</span><span class="icon-btn"></span></div>
+        <div class="ob-body enter-${dir}">
+          <h2>누구로 체험해 볼까요?</h2>
+          <p class="ob-sub">고른 사람의 취향과 이상형으로 매칭이 돌아가요.</p>
+          <div class="seg gender-seg">
+            <button class="${ob.picker === "남" ? "on" : ""}" data-act="ob-pick-tab:남"><img src="icon-male.png" alt="">남자</button>
+            <button class="${ob.picker === "여" ? "on" : ""}" data-act="ob-pick-tab:여"><img src="icon-female.png" alt="">여자</button>
+          </div>
+          <div class="sample-list">${list.map(({ p, i }) => `
+            <button class="sample" data-act="ob-pick:${i}">
+              <span class="sample-photo" style="background-image:url(${p.photo}?v=3)"></span>
+              <div class="sample-info">
+                <b>${esc(p.name)} <span>${p.age}</span></b>
+                <small>${p.region} · ${esc(p.job)}</small>
+                <div>${p.interests.slice(0, 3).map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
+              </div>
+              <span class="chev">›</span>
+            </button>`).join("")}
           </div>
         </div>
       </div>`;
   }
 
+  if (step.key === "welcome") {
+    return `
+      <div class="ob welcome enter-${dir}">
+        <div class="welcome-art"><img src="logo.png?v=3" alt=""><span class="pen">오늘, 누구와?</span></div>
+        <h2>마음이 통하는 한 사람,<br>이유까지 알려드릴게요</h2>
+        <p>취향, 성격, 생활 습관까지 살펴보고<br>왜 잘 맞는지도 함께 알려드려요.</p>
+        <div class="ob-foot">
+          <button class="btn" data-act="ob-next">내 프로필 만들기</button>
+          <button class="btn line" data-act="ob-pick-open">예시 프로필로 체험하기</button>
+      </div>`;
+  }
+
   if (step.key === "done") {
     const avatar = d.photo
-      ? `<div class="me-av big photo" style="background-image:url(${d.photo})"></div>`
+      ? `<div class="me-av big photo" style="background-image:url(${d.photo}?v=3)"></div>`
       : `<div class="me-av big">${esc(d.name.slice(0, 1))}</div>`;
     return `
       <div class="ob done enter-${dir}">
         ${ob.sample ? "" : `<div class="done-check">✓</div>`}
-        <h2>${ob.sample ? `${d.gender === "남" ? "남자" : "여자"} 예시 프로필로<br>시작할게요` : `${esc(d.name)}님의 프로필이<br>완성됐어요`}</h2>
+        <h2>${ob.sample ? `${esc(d.name)}님으로<br>체험해 볼게요` : `${esc(d.name)}님의 프로필이<br>완성됐어요`}</h2>
         <div class="summary">
           ${avatar}
           <b>${esc(d.name)}, ${d.age}</b>
