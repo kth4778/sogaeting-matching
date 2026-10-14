@@ -3,8 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node --env-file=.env server.js",
-    "deploy:api": "npx wrangler@4 deploy"
+    "start": "node --env-file=.env server.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
