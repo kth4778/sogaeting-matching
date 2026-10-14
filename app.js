@@ -156,6 +156,7 @@ function jaccard(a, b) {
 }
 
 async function embeddingRank(me, people) {
+  await sleep(1400); // 진행이 눈에 보이도록 잠깐 기다린다
   return people.map(p => {
     // 표기는 다르지만 같은 묶음인 관심사 한 쌍 (없으면 아무 쌍)
     let pair = null;
@@ -210,7 +211,7 @@ const MOCK_API = {
 // ---------- 서버 호출 (채팅만 실제 Claude) ----------
 
 async function api(path, body) {
-  if (MOCK_API[path]) { await sleep(500); return { ...MOCK_API[path](body), model: "목데이터", ms: 500 }; }
+  if (MOCK_API[path]) { await sleep(1600); return { ...MOCK_API[path](body), model: "목데이터", ms: 1600 }; }
   // GitHub Pages에서는 중계 서버(Worker)로, 로컬에서는 같은 서버의 /api로 보낸다
   const base = location.hostname.endsWith("github.io") ? PAGES_API_BASE : "";
   const res = await fetch(base + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -337,7 +338,8 @@ async function runMatching() {
 
   // 1단계
   setPipe(0, "run");
-  await sleep(400);
+  showLogCard();
+  await sleep(900);
   logStage(1, "규칙 거르기", "절대 안 되는 조건에 걸리는 사람을 먼저 뺍니다.",
     "조건이 안 맞는 사람은 점수를 매길 필요가 없어요. 내 조건과 상대 조건을 둘 다 봅니다.");
   const { passed, excluded } = ruleFilter(me);
@@ -355,11 +357,12 @@ async function runMatching() {
     return;
   }
   setPipe(0, "done", `${PROFILES.length}명 → ${passed.length}명`);
+  await sleep(700);
 
   // 2단계
   state.step = 2; render();
   setPipe(1, "run");
-  await sleep(300);
+  await sleep(800);
   logStage(2, "임베딩 후보 추리기", "관심사를 같은 뜻끼리 묶어 비교하고, 취향이 가까운 사람을 찾습니다.",
     "표기가 달라도(등산 ≈ 산 타기) 뜻이 비슷하면 가깝게 잡혀요. Claude에게 넘길 후보를 5명으로 줄입니다.");
   const w2 = logWorking(`${passed.length + 1}명의 관심사를 비교하는 중`);
@@ -380,6 +383,7 @@ async function runMatching() {
   const cut = ranked.slice(TOP_K);
   if (cut.length) logSub(`   (탈락: ${cut.map(c => `${c.profile.name} ${c.embed.toFixed(3)}`).join(", ")})`, "dim");
   setPipe(1, "done", `${passed.length}명 → ${top.length}명`);
+  await sleep(700);
 
   // 3단계
   state.step = 3; render();
@@ -559,6 +563,13 @@ async function flushChat(id) {
 
 // ---------- 화면 그리기 ----------
 // 매칭 과정 카드: 진행 막대와 로그가 들어갈 자리 (render 뒤에 실제 요소를 끼운다)
+// 매칭이 시작되면 화면을 매칭 과정 카드로 내려 보여 준다
+function showLogCard() {
+  const card = document.querySelector(".inlog");
+  const screen = $("#screen");
+  if (card) screen.scrollTo({ top: card.offsetTop - 60, behavior: "smooth" });
+}
+
 function logCardHtml() {
   return `<div class="inlog"><div class="inlog-head"><b>매칭 과정</b><button data-act="clear-log">지우기</button></div><div id="pipe-slot"></div><div id="log-slot"></div></div>`;
 }
@@ -818,6 +829,11 @@ function render() {
 
   $("#pipe-slot")?.replaceWith(pipelineEl);
   $("#log-slot")?.replaceWith(logEl);
+  // 매칭 중에는 다시 그려도 화면이 매칭 과정 카드에 머문다
+  if (state.running && state.tab === "home") {
+    const card = document.querySelector(".inlog");
+    if (card) screen.scrollTop = card.offsetTop - 60;
+  }
   const msgs = $("#msgs");
   if (msgs) msgs.scrollTop = msgs.scrollHeight;
   bindSwipe();
