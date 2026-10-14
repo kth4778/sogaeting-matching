@@ -1,22 +1,19 @@
-import { PROFILES, SAMPLE_PROFILES } from "./profiles.js";
+import { PROFILES, SAMPLE_PROFILES, profileText } from "./profiles.js";
 import { PAGES_API_BASE } from "./config.js";
 import { STEPS as OB_STEPS, INTEREST_MAX, blankDraft, onboardingHtml, setField, getField } from "./onboarding.js";
 
-// 임베딩: 키 없이 브라우저에서 도는 다국어 문장 임베딩 모델
-const TRANSFORMERS_URL = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2";
-const EMBED_MODEL = "Xenova/multilingual-e5-small";
 const TOP_K = 5;            // 임베딩 단계에서 LLM에게 넘길 후보 수
 const MUTUAL_MIN = 60;      // 좋아요를 받았을 때 상대도 좋아요를 누를 궁합 점수 기준
 
 const $ = sel => document.querySelector(sel);
 const byId = id => PROFILES.find(p => p.id === id);
-const PHOTO_V = 3; // 사진을 새로 만들면 올려서 브라우저에 남은 옛 사진을 쓰지 않게 한다
-const photo = p => `photos/${p.id}.png?v=${PHOTO_V}`;
+const PHOTO_V = 4; // 사진을 새로 만들면 올려서 브라우저에 남은 옛 사진을 쓰지 않게 한다
+const photo = p => `photos/${p.id}.jpg?v=${PHOTO_V}`;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 내 사진이 있으면(예시 프로필) 사진, 없으면 이름 첫 글자로 동그라미를 그린다
 const meAvatar = (me, cls) => me.photo
-  ? `<div class="${cls} photo" style="background-image:url(${me.photo}?v=${PHOTO_V})"></div>`
+  ? `<div class="${cls} photo" style="background-image:url(${me.photo.replace(".png", ".jpg")}?v=${PHOTO_V})"></div>`
   : `<div class="${cls}">${esc(me.name.slice(0, 1))}</div>`;
 // 마지막 글자 받침에 따라 을/를을 고른다
 const eulReul = name => ((name.charCodeAt(name.length - 1) - 0xac00) % 28 ? `${name}을` : `${name}를`);
@@ -48,7 +45,9 @@ const state = {
 };
 
 // ---------- 오른쪽 실시간 로그 ----------
-const logEl = $("#log");
+// 매칭 과정 로그: 매칭 화면 안에 붙인다 (화면을 다시 그려도 내용이 남도록 한 번만 만든다)
+const logEl = Object.assign(document.createElement("div"), { className: "inlog-body" });
+const pipelineEl = Object.assign(document.createElement("div"), { className: "pipeline" });
 const time = () => new Date().toTimeString().slice(0, 8);
 
 function scrollLog() { logEl.scrollTop = logEl.scrollHeight; }
@@ -84,7 +83,7 @@ function logTree(lines, cls = "") {
 function bootLog() {
   logEl.innerHTML = "";
   logCmd(`<b>$</b> npm start`);
-  logCmd(`> 매칭 로그 대기 중... 아이폰에서 「매칭 시작」을 누르세요 <span class="cursor"></span>`);
+  logCmd(`> 매칭 로그 대기 중... 앱에서 「매칭 시작」을 누르세요 <span class="cursor"></span>`);
   logGap();
 }
 
@@ -122,38 +121,32 @@ function ruleFilter(me) {
 // 상대 쪽 조건만 다시 확인 (좋아요를 받은 상대가 나를 받아줄 수 있는지)
 const theyAccept = (me, p) => RULES.filter(r => r.side === "them").every(r => r.test(me, p));
 
-// ---------- 2단계: 임베딩 ----------
-let extractor = null;
-const vectors = new Map(); // 문장 -> 벡터 (한 번 계산한 건 다시 안 함)
+// ---------- 2단계: 임베딩 (목데이터) ----------
+// 실제 모델 대신 「같은 뜻 묶음」 표로 즉시 계산한다. 표기가 달라도 같은 묶음이면 가깝다고 본다 (등산 ≈ 산 타기).
+const MEANING_GROUPS = [
+  ["등산", "산 타기", "트레킹", "캠핑", "클라이밍"],
+  ["러닝", "헬스", "요가", "자전거", "축구"],
+  ["카페 투어", "카페 탐방", "커피", "커피 마시기"],
+  ["맛집 탐방", "요리", "베이킹", "술자리"],
+  ["여행", "페스티벌"],
+  ["전시회", "미술관", "그림 그리기", "사진", "필름 카메라", "필름카메라"],
+  ["영화 보기", "넷플릭스", "넷플릭스 보기"],
+  ["독서", "책 읽기"],
+  ["음악 감상", "기타 연주", "밴드 공연", "교회 찬양팀"],
+  ["게임", "보드게임", "코딩", "코딩 공부"],
+  ["반려견 산책"],
+  ["교회 봉사"],
+];
+const groupOf = word => MEANING_GROUPS.findIndex(g => g.includes(word));
 
-async function getExtractor() {
-  if (extractor) return extractor;
-  const row = logSub(`├─ 임베딩 모델 불러오는 중 (${EMBED_MODEL}, 처음 한 번만)`, "dim");
-  const { pipeline } = await import(TRANSFORMERS_URL);
-  extractor = await pipeline("feature-extraction", EMBED_MODEL, {
-    progress_callback: e => {
-      if (e.status === "progress" && e.file?.endsWith(".onnx")) {
-        row.textContent = `├─ 임베딩 모델 내려받는 중 ${Math.round(e.progress)}%`;
-      }
-    },
-  });
-  row.textContent = "├─ 임베딩 모델 준비 완료";
-  return extractor;
+// 관심사 묶음이 얼마나 겹치는지 (0~1)
+function meaningSimilarity(a, b) {
+  const ga = new Set(a.map(groupOf).filter(i => i >= 0));
+  const gb = new Set(b.map(groupOf).filter(i => i >= 0));
+  if (!ga.size || !gb.size) return 0;
+  const shared = [...ga].filter(g => gb.has(g)).length;
+  return shared / Math.sqrt(ga.size * gb.size);
 }
-
-async function embed(texts) {
-  const todo = [...new Set(texts.filter(t => !vectors.has(t)))];
-  if (todo.length) {
-    const ex = await getExtractor();
-    // e5 계열은 앞에 "query: "를 붙여야 성능이 나온다
-    const out = await ex(todo.map(t => `query: ${t}`), { pooling: "mean", normalize: true });
-    out.tolist().forEach((v, i) => vectors.set(todo[i], v));
-  }
-  return texts.map(t => vectors.get(t));
-}
-
-const cosine = (a, b) => a.reduce((sum, x, i) => sum + x * b[i], 0); // 정규화돼 있어 내적 = 코사인
-const profileText = p => `관심사: ${p.interests.join(", ")}. ${p.intro} ${p.personality}`;
 
 // 단어가 똑같아야만 겹친다고 보는 공식 (임베딩과 비교용)
 function jaccard(a, b) {
@@ -163,26 +156,61 @@ function jaccard(a, b) {
 }
 
 async function embeddingRank(me, people) {
-  const [meVec, ...vecs] = await embed([profileText(me), ...people.map(profileText)]);
-  const words = [...new Set([...me.interests, ...people.flatMap(p => p.interests)])];
-  const wordVecs = new Map();
-  (await embed(words)).forEach((v, i) => wordVecs.set(words[i], v));
-
-  return people.map((p, i) => {
-    // 표기는 다르지만 뜻이 가장 가까운 관심사 한 쌍 (예: 등산 ≈ 산 타기).
-    // 똑같은 단어는 자카드도 잡아내므로, 임베딩만 찾을 수 있는 쌍을 보여 준다.
+  return people.map(p => {
+    // 표기는 다르지만 같은 묶음인 관심사 한 쌍 (없으면 아무 쌍)
     let pair = null;
     for (const a of me.interests) for (const b of p.interests) {
-      if (a === b) continue;
-      const sim = cosine(wordVecs.get(a), wordVecs.get(b));
-      if (!pair || sim > pair.sim) pair = { a, b, sim };
+      if (a !== b && groupOf(a) >= 0 && groupOf(a) === groupOf(b)) pair ??= { a, b, sim: 0.9 };
     }
-    return { profile: p, embed: cosine(meVec, vecs[i]), jaccard: jaccard(me.interests, p.interests), pair };
+    pair ??= { a: me.interests[0], b: p.interests[0], sim: 0.5 };
+    const embed = 0.6 + 0.35 * meaningSimilarity(me.interests, p.interests) + (me.mbti[0] === p.mbti[0] ? 0.03 : 0);
+    return { profile: p, embed, jaccard: jaccard(me.interests, p.interests), pair };
   }).sort((x, y) => y.embed - x.embed);
 }
 
-// ---------- 3·4단계: 서버를 거쳐 Claude 호출 ----------
+// ---------- 3·4단계: LLM 재순위·이유 설명 (목데이터) ----------
+// 실제 API 대신 점수표로 바로 만든다. 무엇에 몇 점을 줬는지 그대로 이유가 된다.
+function mockScore(me, p, embed) {
+  const parts = [
+    ["취향", Math.round(embed * 50)],
+    ["같은 지역", me.region === p.region ? 12 : 0],
+    ["성향(E/I)", me.mbti[0] === p.mbti[0] ? 8 : 0],
+    ["생활 리듬(J/P)", me.mbti[3] === p.mbti[3] ? 6 : 0],
+    ["술 습관", me.drinking === p.drinking ? 6 : 0],
+    ["나이 차", Math.abs(me.age - p.age) <= 3 ? 8 : 3],
+  ];
+  return { score: Math.min(98, parts.reduce((s, [, v]) => s + v, 0)), parts };
+}
+
+const MOCK_API = {
+  "/api/rerank": ({ me, candidates }) => ({
+    ranking: candidates.map(c => {
+      const { score, parts } = mockScore(me, c.profile, c.embed);
+      const top = parts.filter(([, v]) => v >= 6).map(([k]) => k).slice(0, 3).join(" · ");
+      return { id: c.profile.id, score, oneLine: `${top || "취향"}이 잘 맞아요` };
+    }),
+    usage: { input_tokens: 0, output_tokens: 0 },
+  }),
+  "/api/explain": ({ me, partner }) => {
+    const shared = partner.interests.filter(t => me.interests.some(m => groupOf(m) >= 0 && groupOf(m) === groupOf(t)));
+    return {
+      headline: shared.length ? `${shared[0]}을 함께 즐길 수 있는 사람이에요` : "생활 리듬이 비슷한 사람이에요",
+      reasons: [
+        { title: "비슷한 취향", detail: `${partner.name}님도 ${(shared.length ? shared : partner.interests).slice(0, 2).join(", ")}을 좋아해요.` },
+        { title: "가까운 거리", detail: me.region === partner.region ? `둘 다 ${me.region}에 있어서 만나기 편해요.` : `${partner.region}에 있어서 중간에서 만나면 좋아요.` },
+        { title: "대화 스타일", detail: `${partner.personality}` },
+      ],
+      caution: me.mbti[0] === "I" && partner.mbti[0] === "I" ? "둘 다 조용한 편이라 처음엔 먼저 말을 걸어 보세요." : "대화 속도가 다를 수 있으니 천천히 알아가 보세요.",
+      firstDate: shared.length ? `${shared[0]} 후에 근처 카페에서 이야기 나눠 보세요.` : "가볍게 카페에서 만나 보세요.",
+      usage: { input_tokens: 0, output_tokens: 0 },
+    };
+  },
+};
+
+// ---------- 서버 호출 (채팅만 실제 Claude) ----------
+
 async function api(path, body) {
+  if (MOCK_API[path]) { await sleep(500); return { ...MOCK_API[path](body), model: "목데이터", ms: 500 }; }
   // GitHub Pages에서는 중계 서버(Worker)로, 로컬에서는 같은 서버의 /api로 보낸다
   const base = location.hostname.endsWith("github.io") ? PAGES_API_BASE : "";
   const res = await fetch(base + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -205,7 +233,7 @@ const PIPE = [
 const pipe = { status: ["wait", "wait", "wait", "wait"], note: ["", "", "", ""] };
 
 function renderPipeline() {
-  $("#pipeline").innerHTML = PIPE.map(([title, desc], i) => {
+  pipelineEl.innerHTML = PIPE.map(([title, desc], i) => {
     const s = pipe.status[i];
     const mark = s === "done" ? "✓" : s === "fail" ? "!" : i + 1;
     return `<div class="pstep ${s}"><span class="pnum">${mark}</span><div><b>${title}</b><small>${esc(pipe.note[i] || desc)}</small></div></div>${i < PIPE.length - 1 ? `<span class="parrow">›</span>` : ""}`;
@@ -254,7 +282,7 @@ async function logRankBoard(before, after) {
   const board = document.createElement("div");
   board.className = "rank-board";
   board.style.height = `${before.length * ROW_H + 40}px`;
-  board.innerHTML = `<div class="rb-head"><span class="rb-title">임베딩 순위</span><span class="rb-state">Claude 점수로 다시 줄 세우는 중…</span></div>` +
+  board.innerHTML = `<div class="rb-head"><span class="rb-title">임베딩 순위</span><span class="rb-state">궁합 점수로 다시 줄 세우는 중…</span></div>` +
     before.map((c, i) => `
       <div class="rb-row" data-id="${c.profile.id}" style="transform:translateY(${i * ROW_H}px)">
         <span class="rb-rank">${i + 1}</span>
@@ -276,7 +304,7 @@ async function logRankBoard(before, after) {
     row.querySelector(".rb-move").textContent = diff > 0 ? `▲ ${diff}` : diff < 0 ? `▼ ${-diff}` : "–";
     countUp(row.querySelector(".rb-score"), c.llmScore, "점");
   });
-  board.querySelector(".rb-title").textContent = "Claude 재순위";
+  board.querySelector(".rb-title").textContent = "궁합 점수 순위";
   board.querySelector(".rb-state").textContent = "순위 확정";
   await sleep(1000);
 }
@@ -332,9 +360,9 @@ async function runMatching() {
   state.step = 2; render();
   setPipe(1, "run");
   await sleep(300);
-  logStage(2, "임베딩 후보 추리기", "관심사·소개·성격 문장을 숫자 좌표로 바꾸고, 내 좌표와 가까운 사람을 찾습니다.",
+  logStage(2, "임베딩 후보 추리기", "관심사를 같은 뜻끼리 묶어 비교하고, 취향이 가까운 사람을 찾습니다.",
     "표기가 달라도(등산 ≈ 산 타기) 뜻이 비슷하면 가깝게 잡혀요. Claude에게 넘길 후보를 5명으로 줄입니다.");
-  const w2 = logWorking(`${passed.length + 1}명의 문장을 좌표로 바꾸는 중`);
+  const w2 = logWorking(`${passed.length + 1}명의 관심사를 비교하는 중`);
   let ranked;
   try {
     ranked = await embeddingRank(me, passed);
@@ -356,9 +384,9 @@ async function runMatching() {
   // 3단계
   state.step = 3; render();
   setPipe(2, "run");
-  logStage(3, "LLM 재순위", `Claude가 ${top.length}명의 프로필 글을 직접 읽고 다시 줄 세웁니다.`,
+  logStage(3, "LLM 재순위", `${top.length}명을 지역·성향·생활 습관 점수표로 다시 줄 세웁니다.`,
     "임베딩은 단어가 비슷한지만 봐요. 성격, 대화 속도, 생활 리듬이 맞는지는 글을 읽어야 알 수 있어요.");
-  const w3 = logWorking(`Claude가 ${top.length}명의 프로필을 읽는 중`);
+  const w3 = logWorking(`${top.length}명 점수 매기는 중`);
   let final;
   try {
     const res = await api("/api/rerank", { me, candidates: top.map(c => ({ profile: c.profile, embed: c.embed })) });
@@ -383,7 +411,7 @@ async function runMatching() {
   setPipe(3, "run");
   logStage(4, "LLM 이유 설명", `1위 ${eulReul(final[0].profile.name)} 고른 이유를 두 사람 프로필에 적힌 내용만으로 씁니다.`,
     "점수만 보여 주면 왜 1위인지 알 수 없어요. 사람이 읽을 수 있는 이유로 바꿔 화면에 보여 줍니다.");
-  const w4 = logWorking("Claude가 이유를 쓰는 중");
+  const w4 = logWorking("이유 정리하는 중");
   let explain = null;
   try {
     const res = await api("/api/explain", { me, partner: final[0].profile, embed: final[0].embed, llmScore: final[0].llmScore });
@@ -462,9 +490,9 @@ function showMatch(p) {
 }
 
 // ---------- 채팅 ----------
-// 내가 보낸 메시지는 바로 화면에 쌓고, 5초 동안 더 보내지 않으면 그동안 보낸 것을 묶어서 상대에게 넘긴다.
+// 내가 보낸 메시지는 바로 상대에게 넘긴다. 답장을 기다리는 동안 보낸 메시지는 모아 두었다가 답장 직후 한 번에 넘긴다.
 // 상대가 답장을 쓰는 중에도 계속 보낼 수 있다.
-const CHAT_IDLE_MS = 5000;
+const CHAT_IDLE_MS = 0; // 보내면 바로 넘긴다 (답장 대기 중에 보낸 것은 답장 직후 이어서 보냄)
 const chatRuntime = {}; // 대화방 id -> { timer, inflight, lastSentAt }
 
 function queueMessage(text) {
@@ -503,7 +531,7 @@ async function flushChat(id) {
 
   rt.inflight = true;
   render();
-  logSub(`├─ ${CHAT_IDLE_MS / 1000}초 동안 추가 입력이 없어 메시지 ${count}개를 묶어서 보냄`, "dim");
+  if (count > 1) logSub(`├─ 답장을 기다리는 동안 보낸 메시지 ${count}개를 묶어서 보냄`, "dim");
   const answeredUpTo = history.length;
   try {
     const res = await api("/api/chat", { me: state.me, partner: p, history: history.slice(0, answeredUpTo) });
@@ -525,25 +553,14 @@ async function flushChat(id) {
   rt.inflight = false;
   save("chats", state.chats);
   render();
-  // 답장을 기다리는 동안 더 보낸 메시지가 있으면 다시 5초를 기다렸다 보낸다
+  // 답장을 기다리는 동안 더 보낸 메시지가 있으면 바로 이어서 보낸다
   if (!state.ended[id] && unanswered(history)) scheduleFlush(id);
 }
 
 // ---------- 화면 그리기 ----------
-// 폰 화면에는 기술 이름 대신 사용자가 이해하는 말로 보여 준다 (기술 이름은 오른쪽 로그에만)
-const STEPS = [
-  ["조건 확인", "나이·흡연·종교, 서로의 조건을 맞춰 봐요"],
-  ["취향 비교", "관심사와 소개가 비슷한 사람을 찾아요"],
-  ["성격 궁합", "대화 스타일까지 보고 순서를 정해요"],
-  ["추천 이유", "왜 잘 맞는지 알려드려요"],
-];
-
-function stepsHtml() {
-  return `<div class="steps">${STEPS.map(([t, d], i) => {
-    const n = i + 1;
-    const cls = state.step === n ? "doing" : state.step > n ? "done" : "";
-    return `<div class="step ${cls}"><b>${state.step > n ? "✓" : n}</b><div>${t}<small>${d}</small></div></div>`;
-  }).join("")}</div>`;
+// 매칭 과정 카드: 진행 막대와 로그가 들어갈 자리 (render 뒤에 실제 요소를 끼운다)
+function logCardHtml() {
+  return `<div class="inlog"><div class="inlog-head"><b>매칭 과정</b><button data-act="clear-log">지우기</button></div><div id="pipe-slot"></div><div id="log-slot"></div></div>`;
 }
 
 function homeHtml() {
@@ -555,8 +572,8 @@ function homeHtml() {
         <h2>${state.running ? "가장 잘 맞는 사람을<br>찾고 있어요" : "오늘 가장 잘 맞는<br>한 사람을 찾아드려요"}</h2>
         <p>취향과 성격, 생활 습관까지 살펴보고<br>왜 잘 맞는지도 함께 알려드려요.</p>
       </div>
-      ${stepsHtml()}
-      <div class="pad"><button class="btn" data-act="run" ${state.running ? "disabled" : ""}>${state.running ? "매칭 중..." : "매칭 시작 →"}</button></div>`;
+      <div class="pad"><button class="btn" data-act="run" ${state.running ? "disabled" : ""}>${state.running ? "매칭 중..." : "매칭 시작 →"}</button></div>
+      ${logCardHtml()}`;
   }
   if (r.empty || r.error) {
     return `
@@ -582,7 +599,10 @@ function homeHtml() {
     <div class="top-meta"><h3>${esc(p.name)} <span>${p.age}</span></h3><span class="score">♥ ${first.llmScore}점</span></div>
     <div class="top-sub">📍 ${p.region} · ${esc(p.job)}</div>
     <div class="quote">${esc(headline)}</div>
-    <div class="pad"><button class="btn" data-act="detail:${p.id}">왜 이 사람인지 자세히 보기</button></div>
+    <div class="pad two-btn">
+      <button class="btn" data-act="talk:${p.id}">💬 대화하기</button>
+      <button class="btn line" data-act="detail:${p.id}">자세히 보기</button>
+    </div>
     <div class="rank-list">
       ${rest.map((c, i) => {
         const q = byId(c.id);
@@ -591,7 +611,8 @@ function homeHtml() {
         return `<div class="rank-row" data-act="detail:${q.id}"><span class="n">${i + 2}</span><div class="av photo" style="background-image:url(${photo(q)})"></div><div class="who"><b>${esc(q.name)}</b> <span class="muted">${q.age}</span>${move}<small>${esc(c.oneLine)}</small></div><span class="pts">${c.llmScore}</span></div>`;
       }).join("")}
     </div>
-    <div class="pad"><button class="btn line" data-act="run">다시 매칭</button></div>`;
+    <div class="pad"><button class="btn line" data-act="run">다시 매칭</button></div>
+    ${logCardHtml()}`;
 }
 
 function detailHtml(id) {
@@ -747,6 +768,7 @@ function profileHtml() {
         <div><span>흡연</span>${w.nonSmokerOnly ? "비흡연자만" : "상관없음"}</div><div><span>종교</span>${w.religion}</div>
       </div>
       <button class="btn" style="margin-top:20px" data-act="edit-profile">프로필 수정하기</button>
+      <button class="btn line" style="margin-top:10px" data-act="reset">데모 초기화</button>
     </div>`;
 }
 
@@ -794,6 +816,8 @@ function render() {
   lastDetail = state.detail;
 
 
+  $("#pipe-slot")?.replaceWith(pipelineEl);
+  $("#log-slot")?.replaceWith(logEl);
   const msgs = $("#msgs");
   if (msgs) msgs.scrollTop = msgs.scrollHeight;
   bindSwipe();
@@ -863,7 +887,7 @@ function finishOnboarding() {
   state.result = null;
   state.tab = "home";
   // 매칭은 홈의 「매칭 시작」을 눌렀을 때만 돈다
-  logCmd(`> 준비 완료. 아이폰에서 「매칭 시작」을 누르세요 <span class="cursor"></span>`);
+  logCmd(`> 준비 완료. 앱에서 「매칭 시작」을 누르세요 <span class="cursor"></span>`);
   render();
 }
 
@@ -962,8 +986,18 @@ document.addEventListener("click", e => {
     toast("대화방을 나왔어요");
   }
   else if (act === "edit-profile") { startOnboarding(true); }
+  else if (act === "talk") {
+    // 결과 화면에서 바로 대화: 아직 매칭 전이면 매칭으로 만들고 대화방을 연다
+    if (!state.matches.includes(arg)) {
+      state.matches.push(arg);
+      save("matches", state.matches);
+      logLine("매칭", `${byId(arg).name}님과 바로 대화를 시작합니다`, "like");
+    }
+    state.tab = "chats"; state.chatWith = arg; state.detail = null;
+  }
   else if (act === "reset-swipes") { state.swiped = {}; save("swiped", {}); logLine("초기화", "넘긴 기록을 지웠습니다", "sys"); }
   else if (act === "clear-log") { bootLog(); return; }
+  else if (act === "toggle-log") { document.body.classList.toggle("log-open"); scrollLog(); return; }
   else if (act === "reset") {
     if (!confirm("내 프로필, 좋아요, 매칭, 대화 기록을 모두 지울까요?")) return;
     ["me", "result", "swiped", "matches", "chats", "ended"].forEach(k => { try { localStorage.removeItem(k); } catch {} });
@@ -999,8 +1033,10 @@ document.addEventListener("submit", e => {
 });
 
 // 화면 높이에 맞춰 아이폰 크기 조절
+const MOBILE = window.matchMedia("(max-width: 760px)");
 function fitPhone() {
-  const s = Math.min(1.35, (window.innerHeight - 32) / 874);
+  // 모바일에서는 가상 아이폰 없이 화면 전체를 쓰므로 크기를 맞추지 않는다
+  const s = MOBILE.matches ? 1 : Math.min(1.35, (window.innerHeight - 32) / 874);
   document.documentElement.style.setProperty("--s", s.toFixed(3));
 }
 window.addEventListener("resize", fitPhone);
