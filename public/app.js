@@ -84,7 +84,7 @@ function logTree(lines, cls = "") {
 function bootLog() {
   logEl.innerHTML = "";
   logCmd(`<b>$</b> npm start`);
-  logCmd(`> 매칭 로그 대기 중... 아이폰에서 「매칭 시작」을 누르세요 <span class="cursor"></span>`);
+  logCmd(`> 매칭 로그 대기 중... 앱에서 「매칭 시작」을 누르세요 <span class="cursor"></span>`);
   logGap();
 }
 
@@ -774,6 +774,7 @@ function render() {
     screen.scrollTop = 0;
     lastTab = `${state.tab}/${state.chatWith}`;
   }
+  document.querySelector(".log-toggle").classList.toggle("live", state.running);
   document.querySelectorAll("[data-act^='tab:']").forEach(b => b.classList.toggle("active", b.dataset.act === `tab:${state.tab}`));
   $("#tabbar").hidden = !!state.ob || (state.tab === "chats" && !!state.chatWith);
 
@@ -863,7 +864,7 @@ function finishOnboarding() {
   state.result = null;
   state.tab = "home";
   // 매칭은 홈의 「매칭 시작」을 눌렀을 때만 돈다
-  logCmd(`> 준비 완료. 아이폰에서 「매칭 시작」을 누르세요 <span class="cursor"></span>`);
+  logCmd(`> 준비 완료. 앱에서 「매칭 시작」을 누르세요 <span class="cursor"></span>`);
   render();
 }
 
@@ -964,6 +965,7 @@ document.addEventListener("click", e => {
   else if (act === "edit-profile") { startOnboarding(true); }
   else if (act === "reset-swipes") { state.swiped = {}; save("swiped", {}); logLine("초기화", "넘긴 기록을 지웠습니다", "sys"); }
   else if (act === "clear-log") { bootLog(); return; }
+  else if (act === "toggle-log") { document.body.classList.toggle("log-open"); scrollLog(); return; }
   else if (act === "reset") {
     if (!confirm("내 프로필, 좋아요, 매칭, 대화 기록을 모두 지울까요?")) return;
     ["me", "result", "swiped", "matches", "chats", "ended"].forEach(k => { try { localStorage.removeItem(k); } catch {} });
@@ -999,8 +1001,10 @@ document.addEventListener("submit", e => {
 });
 
 // 화면 높이에 맞춰 아이폰 크기 조절
+const MOBILE = window.matchMedia("(max-width: 760px)");
 function fitPhone() {
-  const s = Math.min(1.35, (window.innerHeight - 32) / 874);
+  // 모바일에서는 가상 아이폰 없이 화면 전체를 쓰므로 크기를 맞추지 않는다
+  const s = MOBILE.matches ? 1 : Math.min(1.35, (window.innerHeight - 32) / 874);
   document.documentElement.style.setProperty("--s", s.toFixed(3));
 }
 window.addEventListener("resize", fitPhone);
