@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>오늘, 누구와? — 매칭 로직 데모</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page">
+
+    <main class="stage">
+      <div class="phone" id="phone">
+        <div class="phone-screen">
+          <div class="statusbar">
+            <span>9:41</span>
+            <span class="island"></span>
+            <span class="status-icons">
+              <svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2" width="3" height="10" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+              <svg viewBox="0 0 26 12"><rect x="0.5" y="0.5" width="22" height="11" rx="3" fill="none" stroke="currentColor"/><rect x="2" y="2" width="19" height="8" rx="2"/><rect x="23.5" y="4" width="2" height="4" rx="1"/></svg>
+            </span>
+          </div>
+          <div class="screen" id="screen"></div>
+          <nav class="tabbar" id="tabbar">
+            <button data-act="tab:home"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>매칭</button>
+            <button data-act="tab:cards"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/></svg>카드</button>
+            <button data-act="tab:chats"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>메시지</button>
+            <button data-act="tab:me"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>내 정보</button>
+          </nav>
+          <div class="overlay" id="overlay"></div>
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+    </main>
+
+    <section class="console">
+      <div class="console-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="console-title">matching.log</span>
+        <button data-act="clear-log">로그 지우기</button>
+        <button data-act="reset">데모 초기화</button>
+      </div>
+      <div class="pipeline" id="pipeline"></div>
+      <div class="console-body" id="log"></div>
+    </section>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+.env
+node_modules/
+# 디자인 시안과 이미지 생성 작업표 (작업용 파일)
+generated-images/
+image-jobs*.json
+photo-jobs*.json
+.DS_Store
