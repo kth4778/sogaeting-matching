@@ -1,3 +1,5 @@
+import { SAMPLE_PROFILES } from "./profiles.js";
+
 // 처음 시작할 때 한 화면에 질문 하나씩 묻는 가입 흐름.
 // 여기서 모은 칸이 그대로 매칭 로직의 입력(내 프로필 + 이상형 조건)이 된다.
 
@@ -114,6 +116,33 @@ export function onboardingHtml(ob) {
   const { stepIndex, draft: d, editing, dir } = ob;
   const step = STEPS[stepIndex];
 
+  if (ob.picker) {
+    const list = SAMPLE_PROFILES.map((p, i) => ({ p, i })).filter(x => x.p.gender === ob.picker);
+    return `
+      <div class="ob">
+        <div class="ob-top"><button class="icon-btn" data-act="ob-pick-close" aria-label="뒤로">←</button><span class="ob-top-title">예시 프로필</span><span class="icon-btn"></span></div>
+        <div class="ob-body enter-${dir}">
+          <h2>누구로 체험해 볼까요?</h2>
+          <p class="ob-sub">고른 사람의 취향과 이상형으로 매칭이 돌아가요.</p>
+          <div class="seg gender-seg">
+            <button class="${ob.picker === "남" ? "on" : ""}" data-act="ob-pick-tab:남"><img src="icon-male.png" alt="">남자</button>
+            <button class="${ob.picker === "여" ? "on" : ""}" data-act="ob-pick-tab:여"><img src="icon-female.png" alt="">여자</button>
+          </div>
+          <div class="sample-list">${list.map(({ p, i }) => `
+            <button class="sample" data-act="ob-pick:${i}">
+              <span class="sample-photo" style="background-image:url(${p.photo}?v=3)"></span>
+              <div class="sample-info">
+                <b>${esc(p.name)} <span>${p.age}</span></b>
+                <small>${p.region} · ${esc(p.job)}</small>
+                <div>${p.interests.slice(0, 3).map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
+              </div>
+              <span class="chev">›</span>
+            </button>`).join("")}
+          </div>
+        </div>
+      </div>`;
+  }
+
   if (step.key === "welcome") {
     return `
       <div class="ob welcome enter-${dir}">
@@ -122,12 +151,7 @@ export function onboardingHtml(ob) {
         <p>취향, 성격, 생활 습관까지 살펴보고<br>왜 잘 맞는지도 함께 알려드려요.</p>
         <div class="ob-foot">
           <button class="btn" data-act="ob-next">내 프로필 만들기</button>
-          <p class="quick-label">또는 예시 프로필로 바로 체험</p>
-          <div class="quick-row">
-            <button class="quick" data-act="ob-sample:남"><img class="qicon" src="icon-male.png" alt="">남자로 시작</button>
-            <button class="quick" data-act="ob-sample:여"><img class="qicon" src="icon-female.png" alt="">여자로 시작</button>
-          </div>
-        </div>
+          <button class="btn line" data-act="ob-pick-open">예시 프로필로 체험하기</button>
       </div>`;
   }
 
@@ -138,7 +162,7 @@ export function onboardingHtml(ob) {
     return `
       <div class="ob done enter-${dir}">
         ${ob.sample ? "" : `<div class="done-check">✓</div>`}
-        <h2>${ob.sample ? `${d.gender === "남" ? "남자" : "여자"} 예시 프로필로<br>시작할게요` : `${esc(d.name)}님의 프로필이<br>완성됐어요`}</h2>
+        <h2>${ob.sample ? `${esc(d.name)}님으로<br>체험해 볼게요` : `${esc(d.name)}님의 프로필이<br>완성됐어요`}</h2>
         <div class="summary">
           ${avatar}
           <b>${esc(d.name)}, ${d.age}</b>

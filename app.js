@@ -1,4 +1,5 @@
-import { PROFILES, DEFAULT_ME, DEFAULT_ME_F } from "./profiles.js";
+import { PROFILES, SAMPLE_PROFILES } from "./profiles.js";
+import { PAGES_API_BASE } from "./config.js";
 import { STEPS as OB_STEPS, INTEREST_MAX, blankDraft, onboardingHtml, setField, getField } from "./onboarding.js";
 
 // 임베딩: 키 없이 브라우저에서 도는 다국어 문장 임베딩 모델
@@ -42,7 +43,6 @@ const state = {
   chats: load("chats", {}),     // id -> [{ from, text }]
   chatWith: null,
   detail: null,
-  waitingReply: false,
   ended: load("ended", {}),     // id -> 상대가 나간 이유 (로그용)
   confirmLeave: false,          // 「대화방 나가기」 확인 창
 };
@@ -183,7 +183,9 @@ async function embeddingRank(me, people) {
 
 // ---------- 3·4단계: 서버를 거쳐 Claude 호출 ----------
 async function api(path, body) {
-  const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  // GitHub Pages에서는 중계 서버(Worker)로, 로컬에서는 같은 서버의 /api로 보낸다
+  const base = location.hostname.endsWith("github.io") ? PAGES_API_BASE : "";
+  const res = await fetch(base + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   // GitHub Pages 같은 정적 배포에는 API 서버가 없어 HTML 404가 돌아온다
   if (!(res.headers.get("content-type") ?? "").includes("application/json")) {
     throw new Error("서버 없는 배포판이라 Claude를 부를 수 없어요 (로컬에서 npm start로 실행하면 동작)");
@@ -460,36 +462,71 @@ function showMatch(p) {
 }
 
 // ---------- 채팅 ----------
-async function sendMessage(text) {
-  const id = state.chatWith;
-  const p = byId(id);
-  const history = state.chats[id] ?? [];
-  history.push({ from: "me", text });
-  state.chats[id] = history;
-  state.waitingReply = true;
-  save("chats", state.chats);
-  render();
+// 내가 보낸 메시지는 바로 화면에 쌓고, 5초 동안 더 보내지 않으면 그동안 보낸 것을 묶어서 상대에게 넘긴다.
+// 상대가 답장을 쓰는 중에도 계속 보낼 수 있다.
+const CHAT_IDLE_MS = 5000;
+const chatRuntime = {}; // 대화방 id -> { timer, inflight, lastSentAt }
 
-  logLine("채팅", `나 → ${p.name}: ${text}`, "chat");
+function queueMessage(text) {
+  const id = state.chatWith;
+  const history = (state.chats[id] ??= []);
+  history.push({ from: "me", text });
+  save("chats", state.chats);
+  logLine("채팅", `나 → ${byId(id).name}: ${text}`, "chat");
+  const rt = (chatRuntime[id] ??= {});
+  rt.lastSentAt = Date.now();
+  scheduleFlush(id);
+  render();
+}
+
+function scheduleFlush(id) {
+  const rt = chatRuntime[id];
+  clearTimeout(rt.timer);
+  if (rt.inflight) return; // 답장이 오고 나서 다시 잡는다
+  const wait = Math.max(0, CHAT_IDLE_MS - (Date.now() - rt.lastSentAt));
+  rt.timer = setTimeout(() => flushChat(id), wait);
+}
+
+// 맨 끝에 이어진 「내 메시지」 개수 = 아직 답장을 못 받은 메시지
+function unanswered(history) {
+  let n = 0;
+  for (let i = history.length - 1; i >= 0 && history[i].from === "me"; i--) n++;
+  return n;
+}
+
+async function flushChat(id) {
+  const rt = chatRuntime[id];
+  const p = byId(id);
+  const history = state.chats[id];
+  const count = unanswered(history);
+  if (!count || state.ended[id]) return;
+
+  rt.inflight = true;
+  render();
+  logSub(`├─ ${CHAT_IDLE_MS / 1000}초 동안 추가 입력이 없어 메시지 ${count}개를 묶어서 보냄`, "dim");
+  const answeredUpTo = history.length;
   try {
-    const res = await api("/api/chat", { me: state.me, partner: p, history });
-    history.push({ from: "them", text: res.reply });
+    const res = await api("/api/chat", { me: state.me, partner: p, history: history.slice(0, answeredUpTo) });
+    // 답장은 그 답이 가리키는 묶음 바로 뒤에 넣는다 (기다리는 동안 더 보낸 메시지는 답장 뒤로)
+    history.splice(answeredUpTo, 0, { from: "them", text: res.reply });
     logSub(`├─ Claude가 ${p.name} 역할로 답장 (${(res.ms / 1000).toFixed(1)}초): ${res.reply}`);
     if (res.leave) {
       state.ended[id] = res.reason;
       save("ended", state.ended);
-      history.push({ from: "sys", text: `${p.name}님이 대화방을 나갔어요` });
+      history.splice(answeredUpTo + 1, 0, { from: "sys", text: `${p.name}님이 대화방을 나갔어요` });
       logSub(`└─ LLM 판단: 대화 종료 — ${res.reason}`, "err");
     } else {
       logSub(`└─ LLM 판단: 대화 계속 — ${res.reason}`, "dim");
     }
   } catch (err) {
-    history.push({ from: "sys", text: "지금은 답장을 받을 수 없어요" });
+    history.splice(answeredUpTo, 0, { from: "sys", text: "지금은 답장을 받을 수 없어요" });
     logSub(`└─ 실패: ${err.message}`, "err");
   }
-  state.waitingReply = false;
+  rt.inflight = false;
   save("chats", state.chats);
   render();
+  // 답장을 기다리는 동안 더 보낸 메시지가 있으면 다시 5초를 기다렸다 보낸다
+  if (!state.ended[id] && unanswered(history)) scheduleFlush(id);
 }
 
 // ---------- 화면 그리기 ----------
@@ -668,11 +705,11 @@ function roomHtml() {
       <div class="msgs" id="msgs">
         <span class="sys-note">${esc(p.name)}님과 매칭됐어요 ♥</span>
         ${msgs.map(m => m.from === "sys" ? `<span class="sys-note">${esc(m.text)}</span>` : `<div class="bubble ${m.from}">${esc(m.text)}</div>`).join("")}
-        ${state.waitingReply ? `<div class="bubble them typing">입력 중...</div>` : ""}
+        ${chatRuntime[p.id]?.inflight ? `<div class="bubble them typing"><i></i><i></i><i></i></div>` : ""}
       </div>
       ${state.ended[p.id]
         ? `<div class="ended-bar"><b>${esc(p.name)}님이 대화방을 나갔어요</b><span>더 이상 대화할 수 없어요</span><button class="btn line" data-act="leave-confirm">대화방 지우기</button></div>`
-        : `<form class="composer" id="composer"><input name="text" placeholder="메시지를 입력하세요" autocomplete="off" ${state.waitingReply ? "disabled" : ""}><button aria-label="보내기">↑</button></form>`}
+        : `<form class="composer" id="composer"><input name="text" placeholder="메시지를 입력하세요" autocomplete="off"><button aria-label="보내기">↑</button></form>`}
       ${state.confirmLeave ? `
         <div class="sheet-dim" data-act="leave-cancel"></div>
         <div class="sheet">
@@ -721,7 +758,14 @@ let lastObStep = null;
 function render() {
   const screens = { home: homeHtml, cards: cardsHtml, chats: chatsHtml, me: profileHtml };
   const screen = $("#screen");
+  // 답장이 와서 다시 그려도 입력 중인 글과 커서를 지킨다
+  const typing = $("#composer input");
+  const keep = typing && { value: typing.value, focused: document.activeElement === typing };
   screen.innerHTML = state.me ? screens[state.tab]() : "";
+  if (keep) {
+    const input = $("#composer input");
+    if (input) { input.value = keep.value; if (keep.focused) input.focus(); }
+  }
   screen.classList.toggle("in-room", state.tab === "chats" && !!state.chatWith);
   if (lastTab !== `${state.tab}/${state.chatWith}`) {
     screen.classList.remove("tab-enter");
@@ -738,10 +782,10 @@ function render() {
     overlay.className = "overlay open ob-mode";
     overlay.innerHTML = onboardingHtml(state.ob);
     // 같은 단계를 다시 그릴 때(칩 선택 등)는 들어오는 움직임을 빼서 깜빡이지 않게 한다
-    if (lastObStep === state.ob.stepIndex) overlay.querySelectorAll("[class*='enter-']").forEach(n => n.classList.remove("enter-fwd", "enter-back"));
+    if (lastObStep === `${state.ob.stepIndex}/${state.ob.picker ?? ""}` || (lastObStep?.endsWith("/남") || lastObStep?.endsWith("/여")) && state.ob.picker) overlay.querySelectorAll("[class*='enter-']").forEach(n => n.classList.remove("enter-fwd", "enter-back"));
     // 새 단계에 글자 입력 칸이 있으면 바로 입력할 수 있게 커서를 둔다
     else overlay.querySelector(".ob-body [data-field]:not([data-field='newInterest'])")?.focus({ preventScroll: true });
-    lastObStep = state.ob.stepIndex;
+    lastObStep = `${state.ob.stepIndex}/${state.ob.picker ?? ""}`;
   } else {
     lastObStep = null;
     overlay.className = `overlay ${state.detail ? "open" : ""} ${state.detail && state.detail !== lastDetail ? "slide-in" : ""}`;
@@ -837,13 +881,20 @@ function handleOnboarding(act, arg) {
     ob.stepIndex++; ob.dir = "fwd";
   } else if (act === "ob-back") {
     // 예시 프로필 요약에서 뒤로 가면 처음 화면으로 돌아가 다시 고르게 한다
-    if (ob.sample) { state.ob = { stepIndex: 0, draft: blankDraft(), editing: false, dir: "back" }; render(); return; }
+    if (ob.sample) { state.ob = { stepIndex: 0, draft: blankDraft(), editing: false, dir: "back", picker: ob.draft.gender }; render(); return; }
     ob.stepIndex = Math.max(0, ob.stepIndex - 1); ob.dir = "back";
   } else if (act === "ob-cancel") {
     state.ob = null;
-  } else if (act === "ob-sample") {
-    // 바로 들어가지 않고, 어떤 프로필로 시작하는지 요약부터 보여 준다
-    Object.assign(ob, { draft: structuredClone(arg === "여" ? DEFAULT_ME_F : DEFAULT_ME), sample: true, stepIndex: OB_STEPS.length - 1, dir: "fwd" });
+  } else if (act === "ob-pick-open") {
+    Object.assign(ob, { picker: "남", dir: "fwd" });
+  } else if (act === "ob-pick-tab") {
+    ob.picker = arg;
+  } else if (act === "ob-pick-close") {
+    Object.assign(ob, { picker: null, dir: "back" });
+  } else if (act === "ob-pick") {
+    // 고른 예시 프로필의 요약부터 보여 준다 (바로 매칭하지 않음)
+    const sample = SAMPLE_PROFILES[Number(arg)];
+    Object.assign(ob, { draft: structuredClone(sample), sample: true, picker: null, stepIndex: OB_STEPS.length - 1, dir: "fwd" });
   } else if (act === "ob-finish") {
     finishOnboarding();
     return;
@@ -941,8 +992,10 @@ document.addEventListener("keydown", e => {
 document.addEventListener("submit", e => {
   e.preventDefault();
   if (e.target.id !== "composer") return;
-  const text = String(new FormData(e.target).get("text")).trim();
-  if (text && !state.waitingReply) sendMessage(text);
+  const input = e.target.querySelector("input");
+  const text = input.value.trim();
+  input.value = "";
+  if (text) queueMessage(text);
 });
 
 // 화면 높이에 맞춰 아이폰 크기 조절
