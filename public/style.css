@@ -575,3 +575,19 @@ body { background: radial-gradient(1200px 700px at 20% 10%, #f7e9ec 0%, transpar
   .sub { margin-left: .8em; }
   .rank-board { margin-left: 0; }
 }
+.sheet-grip { display: none; }
+@media (max-width: 760px) {
+  /* 닫혀 있어도 손잡이는 아래에 살짝 보인다 */
+  .console { transform: translateY(calc(100% - 34px)); }
+  body.log-open .console { transform: none; }
+  .sheet-grip { display: flex; justify-content: center; align-items: center; height: 34px; flex-shrink: 0; touch-action: none; cursor: grab; }
+  .sheet-grip i { width: 40px; height: 5px; border-radius: 3px; background: #5a5b60; }
+  .console-bar { touch-action: none; }
+  .log-toggle { display: none; }
+  .tabbar { bottom: calc(env(safe-area-inset-bottom) + 44px); }
+  .screen { padding-bottom: calc(144px + env(safe-area-inset-bottom)); }
+  .composer, .ended-bar { padding-bottom: calc(44px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 760px) {
+  .sheet-grip.live i { background: #e8546b; animation: pulse 1s infinite; }
+}
