@@ -636,3 +636,19 @@ body { background: radial-gradient(1200px 700px at 20% 10%, #f7e9ec 0%, transpar
 .inlog-body .rb-row.first .rb-score { color: #a06d00; }
 .inlog-body .cursor { background: var(--sub); }
 .two-btn { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+/* 매칭 과정 로그 글씨 한 단계 작게 */
+.inlog-head b { font-size: 14px; }
+.inlog .pstep b { font-size: 12px; }
+.inlog .pstep small { font-size: 10.5px; }
+.inlog .pnum { width: 20px; height: 20px; font-size: 11px; }
+.inlog-body { font-size: 12px; line-height: 1.6; max-height: 420px; }
+.inlog-body .cmd { font-size: 11.5px; }
+.inlog-body .tag { font-size: 11px; }
+.inlog-body .stage-box { padding: 10px 12px; }
+.inlog-body .stage-title { font-size: 13.5px; }
+.inlog-body .stage-title .tag { font-size: 11px; }
+.inlog-body .stage-what { font-size: 12.5px; }
+.inlog-body .stage-why { font-size: 11.5px; }
+.inlog-body .rb-row { height: 30px; }
+.inlog-body .rb-name { font-size: 13px; }
+.inlog-body .rb-score, .inlog-body .rb-move { font-size: 12px; }
