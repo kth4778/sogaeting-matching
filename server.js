@@ -78,16 +78,23 @@ async function explain({ me, partner, embed, llmScore }) {
   return { ...res.parsed_output, usage: res.usage };
 }
 
+// 답장과 함께 「대화를 계속할지」를 판단한다. 무례가 계속되면 상대가 대화방을 나간다.
+const ChatSchema = z.object({
+  reply: z.string(),
+  leave: z.boolean(),
+  reason: z.string(),
+});
+
 async function chat({ me, partner, history }) {
-  const res = await claude().messages.create({
+  const res = await claude().messages.parse({
     model: MODEL,
     max_tokens: 2000,
-    output_config: { effort: "low" },
-    system: `너는 소개팅 앱에서 막 매칭된 사람 "${partner.name}"이다. 아래 프로필 그대로의 사람처럼 답한다.\n${describe(partner)}\n\n상대(나에게 말 거는 사람) 프로필:\n${describe(me)}\n\n규칙: 첫 대화라 존댓말, 1~2문장으로 짧게, 메신저 말투. 프로필에 없는 개인정보(연락처, 주소)는 만들어 말하지 않는다.`,
-    messages: history.map(m => ({ role: m.from === "me" ? "user" : "assistant", content: m.text })),
+    output_config: { effort: "low", format: zodOutputFormat(ChatSchema) },
+    system: `너는 소개팅 앱에서 막 매칭된 사람 "${partner.name}"이다. 아래 프로필 그대로의 사람처럼 답한다.\n${describe(partner)}\n\n상대(나에게 말 거는 사람) 프로필:\n${describe(me)}\n\n규칙: 첫 대화라 존댓말, 1~2문장으로 짧게, 메신저 말투. 프로필에 없는 개인정보(연락처, 주소)는 만들어 말하지 않는다.\n대화를 계속할지 판단: 상대가 욕설·모욕·성희롱·협박을 하거나, 불편하다고 말했는데도 무례를 이어 가면 leave를 true로 하고 reply에는 짧게 대화를 끝내는 말을 쓴다. 한 번의 가벼운 실수나 농담이면 leave는 false로 두고 불편하다고 솔직히 말한다. reason은 그렇게 판단한 이유 한 문장(상대에게는 보이지 않음).`,
+    messages: history.filter(m => m.from !== "sys").map(m => ({ role: m.from === "me" ? "user" : "assistant", content: m.text })),
   });
-  const text = res.content.filter(b => b.type === "text").map(b => b.text).join("").trim();
-  return { text, usage: res.usage };
+  if (!res.parsed_output) throw new Error(`LLM 응답을 해석하지 못했습니다 (stop_reason: ${res.stop_reason})`);
+  return { ...res.parsed_output, usage: res.usage };
 }
 
 const ROUTES = { "/api/rerank": rerank, "/api/explain": explain, "/api/chat": chat };

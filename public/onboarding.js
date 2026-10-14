@@ -30,13 +30,13 @@ export const STEPS = [
   { key: "welcome" },
   { key: "name", title: "이름을 알려주세요", sub: "상대에게 보여질 이름이에요.", valid: d => d.name.trim().length > 0 },
   { key: "gender", title: "성별을 골라주세요", sub: "만나고 싶은 사람의 성별도 함께요.", valid: d => d.gender && d.wants.gender },
-  { key: "body", title: "나이와 키", sub: "나이는 이상형 조건과 양쪽으로 맞춰 봐요.", valid: () => true },
+  { key: "body", title: "나이와 키", sub: "상대의 이상형 조건과도 맞춰 봐요.", valid: () => true },
   { key: "place", title: "어디서 지내요?", sub: "가까운 사람끼리 만나기 편해요.", valid: d => d.job.trim().length > 0 },
-  { key: "life", title: "생활 습관", sub: "규칙 거르기에서 서로 확인하는 항목이에요.", valid: () => true },
+  { key: "life", title: "생활 습관", sub: "서로 꼭 맞아야 하는 조건이에요.", valid: () => true },
   { key: "mbti", title: "MBTI", sub: "모르면 가까운 쪽을 골라도 괜찮아요.", valid: () => true },
-  { key: "interests", title: "관심사를 골라주세요", sub: `${INTEREST_MIN}~${INTEREST_MAX}개. 임베딩이 뜻이 비슷한 사람을 찾아요.`,
+  { key: "interests", title: "관심사를 골라주세요", sub: `${INTEREST_MIN}~${INTEREST_MAX}개. 취향이 비슷한 사람을 찾는 데 써요.`,
     valid: d => d.interests.length >= INTEREST_MIN && d.interests.length <= INTEREST_MAX },
-  { key: "about", title: "나를 소개해 주세요", sub: "LLM이 이 문장을 읽고 성격까지 비교해요.", valid: d => d.intro.trim().length >= 10 && d.personality.trim().length >= 5 },
+  { key: "about", title: "나를 소개해 주세요", sub: "성격이 잘 맞는 사람을 찾는 데 써요.", valid: d => d.intro.trim().length >= 10 && d.personality.trim().length >= 5 },
   { key: "wants", title: "이런 사람이면 좋겠어요", sub: "여기서 정한 조건에 안 맞으면 후보에서 빠져요.", valid: d => d.wants.ageMin <= d.wants.ageMax },
   { key: "done" },
 ];
@@ -117,15 +117,15 @@ export function onboardingHtml(ob) {
   if (step.key === "welcome") {
     return `
       <div class="ob welcome enter-${dir}">
-        <div class="welcome-art"><span class="pen">오늘,<br>누구와?</span></div>
+        <div class="welcome-art"><img src="logo.png?v=3" alt=""><span class="pen">오늘, 누구와?</span></div>
         <h2>마음이 통하는 한 사람,<br>이유까지 알려드릴게요</h2>
-        <p>규칙 · 임베딩 · LLM 세 가지로 고르고<br>왜 골랐는지 숨기지 않아요.</p>
+        <p>취향, 성격, 생활 습관까지 살펴보고<br>왜 잘 맞는지도 함께 알려드려요.</p>
         <div class="ob-foot">
           <button class="btn" data-act="ob-next">내 프로필 만들기</button>
           <p class="quick-label">또는 예시 프로필로 바로 체험</p>
           <div class="quick-row">
-            <button class="quick" data-act="ob-sample:남"><span class="qphoto" style="background-image:url(photos/me-m.png)"></span>남자로 시작</button>
-            <button class="quick" data-act="ob-sample:여"><span class="qphoto" style="background-image:url(photos/me-f.png)"></span>여자로 시작</button>
+            <button class="quick" data-act="ob-sample:남"><img class="qicon" src="icon-male.png" alt="">남자로 시작</button>
+            <button class="quick" data-act="ob-sample:여"><img class="qicon" src="icon-female.png" alt="">여자로 시작</button>
           </div>
         </div>
       </div>`;
@@ -133,7 +133,7 @@ export function onboardingHtml(ob) {
 
   if (step.key === "done") {
     const avatar = d.photo
-      ? `<div class="me-av big photo" style="background-image:url(${d.photo})"></div>`
+      ? `<div class="me-av big photo" style="background-image:url(${d.photo}?v=3)"></div>`
       : `<div class="me-av big">${esc(d.name.slice(0, 1))}</div>`;
     return `
       <div class="ob done enter-${dir}">

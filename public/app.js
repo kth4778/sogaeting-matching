@@ -9,12 +9,13 @@ const MUTUAL_MIN = 60;      // 좋아요를 받았을 때 상대도 좋아요를
 
 const $ = sel => document.querySelector(sel);
 const byId = id => PROFILES.find(p => p.id === id);
-const photo = p => `photos/${p.id}.png`;
+const PHOTO_V = 3; // 사진을 새로 만들면 올려서 브라우저에 남은 옛 사진을 쓰지 않게 한다
+const photo = p => `photos/${p.id}.png?v=${PHOTO_V}`;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 내 사진이 있으면(예시 프로필) 사진, 없으면 이름 첫 글자로 동그라미를 그린다
 const meAvatar = (me, cls) => me.photo
-  ? `<div class="${cls} photo" style="background-image:url(${me.photo})"></div>`
+  ? `<div class="${cls} photo" style="background-image:url(${me.photo}?v=${PHOTO_V})"></div>`
   : `<div class="${cls}">${esc(me.name.slice(0, 1))}</div>`;
 // 마지막 글자 받침에 따라 을/를을 고른다
 const eulReul = name => ((name.charCodeAt(name.length - 1) - 0xac00) % 28 ? `${name}을` : `${name}를`);
@@ -42,6 +43,8 @@ const state = {
   chatWith: null,
   detail: null,
   waitingReply: false,
+  ended: load("ended", {}),     // id -> 상대가 나간 이유 (로그용)
+  confirmLeave: false,          // 「대화방 나가기」 확인 창
 };
 
 // ---------- 오른쪽 실시간 로그 ----------
@@ -243,6 +246,50 @@ function logWorking(text) {
   };
 }
 
+// 재순위 전후를 같은 판에서 보여 준다: 임베딩 순서로 놓았다가 Claude 점수 순서로 줄이 움직여 자리를 바꾼다
+const ROW_H = 38;
+async function logRankBoard(before, after) {
+  const board = document.createElement("div");
+  board.className = "rank-board";
+  board.style.height = `${before.length * ROW_H + 40}px`;
+  board.innerHTML = `<div class="rb-head"><span class="rb-title">임베딩 순위</span><span class="rb-state">Claude 점수로 다시 줄 세우는 중…</span></div>` +
+    before.map((c, i) => `
+      <div class="rb-row" data-id="${c.profile.id}" style="transform:translateY(${i * ROW_H}px)">
+        <span class="rb-rank">${i + 1}</span>
+        <span class="rb-av" style="background-image:url(${photo(c.profile)})"></span>
+        <span class="rb-name">${esc(c.profile.name)}</span>
+        <span class="rb-move"></span>
+        <span class="rb-score">${c.embed.toFixed(3)}</span>
+      </div>`).join("");
+  logEl.append(board);
+  scrollLog();
+  await sleep(800);
+  after.forEach((c, i) => {
+    const row = board.querySelector(`[data-id="${c.profile.id}"]`);
+    const diff = before.findIndex(b => b.profile.id === c.profile.id) - i;
+    row.style.transform = `translateY(${i * ROW_H}px)`;
+    row.classList.add(diff > 0 ? "up" : diff < 0 ? "down" : "same");
+    if (i === 0) row.classList.add("first");
+    row.querySelector(".rb-rank").textContent = i + 1;
+    row.querySelector(".rb-move").textContent = diff > 0 ? `▲ ${diff}` : diff < 0 ? `▼ ${-diff}` : "–";
+    countUp(row.querySelector(".rb-score"), c.llmScore, "점");
+  });
+  board.querySelector(".rb-title").textContent = "Claude 재순위";
+  board.querySelector(".rb-state").textContent = "순위 확정";
+  await sleep(1000);
+}
+
+// 숫자를 0부터 목표값까지 올라가며 보여 준다
+function countUp(el, to, unit) {
+  const t0 = performance.now();
+  const step = now => {
+    const k = Math.min(1, (now - t0) / 800);
+    el.textContent = `${Math.round(to * k)}${unit}`;
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 // ---------- 전체 매칭 흐름 ----------
 async function runMatching() {
   if (state.running) return;
@@ -319,16 +366,13 @@ async function runMatching() {
       .filter(c => scoreOf.has(c.profile.id))
       .map(c => ({ ...c, llmScore: scoreOf.get(c.profile.id).score, oneLine: scoreOf.get(c.profile.id).oneLine }))
       .sort((a, b) => b.llmScore - a.llmScore);
-    final.forEach((c, i) => {
-      const before = top.findIndex(t => t.profile.id === c.profile.id) + 1;
-      const move = before === i + 1 ? "변동 없음" : `${before}위→${i + 1}위`;
-      logSub(`${i === final.length - 1 ? "└─" : "├─"} ${i + 1}. ${c.profile.name} ${c.llmScore}점 (${move}) — ${c.oneLine}`, i === 0 ? "hl" : "");
-    });
+    await logRankBoard(top, final);
+    final.forEach((c, i) => logSub(`${i === final.length - 1 ? "└─" : "├─"} ${i + 1}위 ${c.profile.name}: ${c.oneLine}`, i === 0 ? "hl" : ""));
     setPipe(2, "done", `1위 ${final[0].profile.name} ${final[0].llmScore}점`);
   } catch (err) {
     w3.fail(`실패: ${err.message}`);
     logSub("   → 임베딩 순서를 그대로 씁니다", "dim");
-    final = top.map(c => ({ ...c, llmScore: Math.round(c.embed * 100), oneLine: "LLM 미연결 — 임베딩 유사도 순위" }));
+    final = top.map(c => ({ ...c, llmScore: Math.round(c.embed * 100), oneLine: "관심사와 소개가 비슷해요" }));
     setPipe(2, "fail", "LLM 미연결");
   }
 
@@ -400,16 +444,19 @@ function react(id, kind) {
   }
 }
 
+// 매칭 성사: 화면을 가리지 않고 아이폰 알림처럼 위에서 내려왔다가 사라진다. 누르면 대화방으로 간다.
 function showMatch(p) {
-  const pop = document.createElement("div");
-  pop.className = "match-pop";
-  pop.innerHTML = `
-    <h2>It's a Match!</h2>
-    <p>${esc(p.name)}님과 서로 좋아요를 눌렀어요</p>
-    <div class="pair">${meAvatar(state.me, "av me-av")}<div class="av photo" style="background-image:url(${photo(p)})"></div></div>
-    <button class="btn" data-act="chat:${p.id}">대화 시작하기</button>
-    <button class="btn line" data-act="close-pop">계속 둘러보기</button>`;
-  $(".phone-screen").append(pop);
+  document.querySelector(".notice")?.remove();
+  const n = document.createElement("button");
+  n.className = "notice";
+  n.dataset.act = `chat:${p.id}`;
+  n.innerHTML = `
+    <div class="notice-av photo" style="background-image:url(${photo(p)})"></div>
+    <div class="notice-text"><b>매칭 성공 ♥</b><span>${esc(p.name)}님도 좋아요를 눌렀어요 · 눌러서 대화하기</span></div>
+    <span class="notice-time">지금</span>`;
+  $(".phone-screen").append(n);
+  setTimeout(() => n.classList.add("out"), 4200);
+  setTimeout(() => n.remove(), 4700);
 }
 
 // ---------- 채팅 ----------
@@ -426,10 +473,18 @@ async function sendMessage(text) {
   logLine("채팅", `나 → ${p.name}: ${text}`, "chat");
   try {
     const res = await api("/api/chat", { me: state.me, partner: p, history });
-    history.push({ from: "them", text: res.text });
-    logSub(`└─ Claude가 ${p.name} 역할로 답장 (${(res.ms / 1000).toFixed(1)}초): ${res.text}`);
+    history.push({ from: "them", text: res.reply });
+    logSub(`├─ Claude가 ${p.name} 역할로 답장 (${(res.ms / 1000).toFixed(1)}초): ${res.reply}`);
+    if (res.leave) {
+      state.ended[id] = res.reason;
+      save("ended", state.ended);
+      history.push({ from: "sys", text: `${p.name}님이 대화방을 나갔어요` });
+      logSub(`└─ LLM 판단: 대화 종료 — ${res.reason}`, "err");
+    } else {
+      logSub(`└─ LLM 판단: 대화 계속 — ${res.reason}`, "dim");
+    }
   } catch (err) {
-    history.push({ from: "sys", text: `답장을 받지 못했어요: ${err.message}` });
+    history.push({ from: "sys", text: "지금은 답장을 받을 수 없어요" });
     logSub(`└─ 실패: ${err.message}`, "err");
   }
   state.waitingReply = false;
@@ -438,11 +493,12 @@ async function sendMessage(text) {
 }
 
 // ---------- 화면 그리기 ----------
+// 폰 화면에는 기술 이름 대신 사용자가 이해하는 말로 보여 준다 (기술 이름은 오른쪽 로그에만)
 const STEPS = [
-  ["규칙 거르기", "흡연·나이·종교·성별, 양쪽 조건 모두"],
-  ["임베딩 후보 추리기", "뜻이 비슷한 사람 상위 5명"],
-  ["LLM 재순위", "성격·대화 스타일까지 보고 다시 정렬"],
-  ["LLM 이유 설명", "왜 1위인지 문장으로"],
+  ["조건 확인", "나이·흡연·종교, 서로의 조건을 맞춰 봐요"],
+  ["취향 비교", "관심사와 소개가 비슷한 사람을 찾아요"],
+  ["성격 궁합", "대화 스타일까지 보고 순서를 정해요"],
+  ["추천 이유", "왜 잘 맞는지 알려드려요"],
 ];
 
 function stepsHtml() {
@@ -460,7 +516,7 @@ function homeHtml() {
       <div class="appbar"><span>오늘의 매칭</span><span class="muted">후보 ${PROFILES.length}명</span></div>
       <div class="intro-hero">
         <h2>${state.running ? "가장 잘 맞는 사람을<br>찾고 있어요" : "오늘 가장 잘 맞는<br>한 사람을 찾아드려요"}</h2>
-        <p>4단계를 거쳐 고르고, 왜 골랐는지까지 보여드려요.<br>오른쪽 로그에서 과정을 실시간으로 볼 수 있어요.</p>
+        <p>취향과 성격, 생활 습관까지 살펴보고<br>왜 잘 맞는지도 함께 알려드려요.</p>
       </div>
       ${stepsHtml()}
       <div class="pad"><button class="btn" data-act="run" ${state.running ? "disabled" : ""}>${state.running ? "매칭 중..." : "매칭 시작 →"}</button></div>`;
@@ -471,7 +527,7 @@ function homeHtml() {
       <div class="empty">
         <div style="font-size:42px">🫥</div>
         <h3>${r.empty ? "조건에 맞는 사람이 없어요" : "매칭 중 문제가 생겼어요"}</h3>
-        <p>${r.empty ? `규칙 거르기에서 ${r.excludedCount}명이 모두 빠졌어요.<br>나이 범위나 흡연·종교 조건을 넓혀 보세요.` : "오른쪽 로그에서 원인을 확인하세요."}</p>
+        <p>${r.empty ? "나이 범위나 흡연·종교 조건을<br>조금 넓혀 보세요." : "잠시 후 다시 시도해 주세요."}</p>
         <button class="btn" data-act="tab:me">이상형 조건 바꾸기</button>
         <div style="height:10px"></div>
         <button class="btn line" data-act="run">다시 매칭</button>
@@ -515,16 +571,13 @@ function detailHtml(id) {
         <h2>${esc(p.name)} <span>${p.age}</span></h2>
         <p class="muted" style="font-size:14px">📍 ${p.region} · ${esc(p.job)}</p>
         ${m ? `
-          <h4>매칭 분석</h4>
-          <div class="facts">
-            <div><span>최종 점수</span><b>${m.llmScore}점</b></div>
-            <div><span>임베딩</span>${m.embed.toFixed(3)}</div>
-            <div><span>자카드</span>${m.jaccard.toFixed(2)}</div>
-            <div><span>가까운 말</span>${esc(m.pair.a)}≈${esc(m.pair.b)}</div>
-          </div>
-          <p style="margin-top:10px;font-size:14px">${esc(m.oneLine)}</p>` : ""}
+          <div class="match-card">
+            <div class="match-score"><b>${m.llmScore}</b><span>점 궁합</span></div>
+            <p>${esc(m.oneLine)}</p>
+            <small>비슷한 취향 · ${esc(m.pair.a)} & ${esc(m.pair.b)}</small>
+          </div>` : ""}
         ${ex ? `
-          <h4>왜 1위인가요? (LLM 설명)</h4>
+          <h4>이런 점이 잘 맞아요</h4>
           ${ex.reasons.map(r => `<div class="reason"><b>${esc(r.title)}</b>${esc(r.detail)}</div>`).join("")}
           <div class="reason" style="background:#fafafa"><b>살짝 다를 수 있는 점</b>${esc(ex.caution)}</div>
           <div class="reason" style="background:var(--pink-soft)"><b>첫 만남 제안</b>${esc(ex.firstDate)}</div>` : ""}
@@ -601,7 +654,8 @@ function chatsHtml() {
     <div class="chat-list">${state.matches.map(id => {
       const p = byId(id);
       const last = (state.chats[id] ?? []).at(-1);
-      return `<div class="row" data-act="chat:${id}"><div class="av photo" style="background-image:url(${photo(p)})"></div><div><b>${esc(p.name)}</b><small>${last ? esc(last.text) : "매칭됐어요! 먼저 인사해 보세요"}</small></div></div>`;
+      const sub = state.ended[id] ? "대화가 끝났어요" : last ? esc(last.text) : "매칭됐어요! 먼저 인사해 보세요";
+      return `<div class="row ${state.ended[id] ? "ended" : ""}" data-act="chat:${id}"><div class="av photo" style="background-image:url(${photo(p)})"></div><div><b>${esc(p.name)}</b><small>${sub}</small></div></div>`;
     }).join("")}</div>`;
 }
 
@@ -610,13 +664,23 @@ function roomHtml() {
   const msgs = state.chats[p.id] ?? [];
   return `
     <div class="room">
-      <div class="room-head"><button data-act="back-chats">←</button><div class="av photo" style="background-image:url(${photo(p)})"></div><b>${esc(p.name)}</b><span class="muted" style="font-size:12px;margin-left:auto">답장은 Claude가 연기해요</span></div>
+      <div class="room-head"><button class="icon-btn" data-act="back-chats" aria-label="뒤로">←</button><div class="av photo" style="background-image:url(${photo(p)})"></div><b>${esc(p.name)}</b><button class="leave-btn" data-act="leave-ask">나가기</button></div>
       <div class="msgs" id="msgs">
         <span class="sys-note">${esc(p.name)}님과 매칭됐어요 ♥</span>
         ${msgs.map(m => m.from === "sys" ? `<span class="sys-note">${esc(m.text)}</span>` : `<div class="bubble ${m.from}">${esc(m.text)}</div>`).join("")}
         ${state.waitingReply ? `<div class="bubble them typing">입력 중...</div>` : ""}
       </div>
-      <form class="composer" id="composer"><input name="text" placeholder="메시지를 입력하세요" autocomplete="off" ${state.waitingReply ? "disabled" : ""}><button aria-label="보내기">↑</button></form>
+      ${state.ended[p.id]
+        ? `<div class="ended-bar"><b>${esc(p.name)}님이 대화방을 나갔어요</b><span>더 이상 대화할 수 없어요</span><button class="btn line" data-act="leave-confirm">대화방 지우기</button></div>`
+        : `<form class="composer" id="composer"><input name="text" placeholder="메시지를 입력하세요" autocomplete="off" ${state.waitingReply ? "disabled" : ""}><button aria-label="보내기">↑</button></form>`}
+      ${state.confirmLeave ? `
+        <div class="sheet-dim" data-act="leave-cancel"></div>
+        <div class="sheet">
+          <b>대화방을 나갈까요?</b>
+          <p>나가면 ${esc(p.name)}님과의 매칭이 끊기고<br>대화 내용도 사라져요.</p>
+          <button class="sheet-danger" data-act="leave-confirm">나가기</button>
+          <button class="sheet-cancel" data-act="leave-cancel">취소</button>
+        </div>` : ""}
     </div>`;
 }
 
@@ -658,6 +722,7 @@ function render() {
   const screens = { home: homeHtml, cards: cardsHtml, chats: chatsHtml, me: profileHtml };
   const screen = $("#screen");
   screen.innerHTML = state.me ? screens[state.tab]() : "";
+  screen.classList.toggle("in-room", state.tab === "chats" && !!state.chatWith);
   if (lastTab !== `${state.tab}/${state.chatWith}`) {
     screen.classList.remove("tab-enter");
     void screen.offsetWidth; // 애니메이션을 다시 시작시키기 위한 리플로우
@@ -829,16 +894,29 @@ document.addEventListener("click", e => {
   else if (act === "detail") { state.detail = arg; }
   else if (act === "close") { state.detail = null; }
   else if (act === "like" || act === "super" || act === "pass") { state.detail = null; react(arg, act); }
-  else if (act === "chat") { document.querySelector(".match-pop")?.remove(); state.detail = null; state.tab = "chats"; state.chatWith = arg; }
-  else if (act === "back-chats") { state.chatWith = null; }
-  else if (act === "close-pop") { el.closest(".match-pop").remove(); return; }
+  else if (act === "chat") { document.querySelector(".notice")?.remove(); state.detail = null; state.tab = "chats"; state.chatWith = arg; }
+  else if (act === "back-chats") { state.chatWith = null; state.confirmLeave = false; }
+  else if (act === "leave-ask") { state.confirmLeave = true; }
+  else if (act === "leave-cancel") { state.confirmLeave = false; }
+  else if (act === "leave-confirm") {
+    // 내가 나가거나, 상대가 나간 방을 지운다: 매칭과 대화 기록을 함께 없앤다
+    const id = state.chatWith;
+    logLine("채팅", `${byId(id).name}님과의 대화방을 ${state.ended[id] ? "지웠습니다" : "내가 나갔습니다"} — 매칭 해제`, "sys");
+    state.matches = state.matches.filter(m => m !== id);
+    delete state.chats[id];
+    delete state.ended[id];
+    ["matches", "chats", "ended"].forEach(k => save(k, state[k]));
+    state.chatWith = null;
+    state.confirmLeave = false;
+    toast("대화방을 나왔어요");
+  }
   else if (act === "edit-profile") { startOnboarding(true); }
   else if (act === "reset-swipes") { state.swiped = {}; save("swiped", {}); logLine("초기화", "넘긴 기록을 지웠습니다", "sys"); }
   else if (act === "clear-log") { bootLog(); return; }
   else if (act === "reset") {
     if (!confirm("내 프로필, 좋아요, 매칭, 대화 기록을 모두 지울까요?")) return;
-    ["me", "result", "swiped", "matches", "chats"].forEach(k => { try { localStorage.removeItem(k); } catch {} });
-    Object.assign(state, { tab: "home", me: null, result: null, swiped: {}, matches: [], chats: {}, chatWith: null, detail: null });
+    ["me", "result", "swiped", "matches", "chats", "ended"].forEach(k => { try { localStorage.removeItem(k); } catch {} });
+    Object.assign(state, { tab: "home", me: null, result: null, swiped: {}, matches: [], chats: {}, ended: {}, chatWith: null, detail: null, confirmLeave: false });
     startOnboarding(false);
     bootLog();
     resetPipe();
@@ -869,11 +947,22 @@ document.addEventListener("submit", e => {
 
 // 화면 높이에 맞춰 아이폰 크기 조절
 function fitPhone() {
-  const s = Math.min(1.35, (window.innerHeight - 32) / 872);
+  const s = Math.min(1.35, (window.innerHeight - 32) / 874);
   document.documentElement.style.setProperty("--s", s.toFixed(3));
 }
 window.addEventListener("resize", fitPhone);
+// 앱을 열면 로고가 잠깐 떴다가 사라진다
+function showSplash() {
+  const splash = document.createElement("div");
+  splash.className = "splash";
+  splash.innerHTML = `<img src="logo.png?v=${PHOTO_V}" alt=""><h1>오늘, 누구와?</h1><p>마음이 통하는 한 사람</p>`;
+  $(".phone-screen").append(splash);
+  setTimeout(() => splash.classList.add("out"), 1500);
+  setTimeout(() => splash.remove(), 2000);
+}
+
 fitPhone();
 bootLog();
 renderPipeline();
 render();
+showSplash();
