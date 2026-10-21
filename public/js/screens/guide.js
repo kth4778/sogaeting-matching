@@ -1,19 +1,19 @@
 // 사용 안내(약 22초): 처음 가입을 마치면 한 번, 내 정보에서 다시 볼 수 있다
-// 위쪽 진행 표시는 두 점 사이를 실이 이어 가는 모양이다(로고와 같은 상징). 마지막에 두 점이 가운데로 와서 로고가 된다.
-// 1 관심사 칩 → 「다음」이 커져 어두운 배경이 된다 → 2 「매칭 시작」이 단계 막대로 바뀌고 20명이 1명으로
-// → 3 카드 넘기기(넘기기·슈퍼 좋아요·좋아요) → 숨 멈춤 → ♥에서 분홍이 터지는 매칭(절정) → 대화 → 시작하기
+// 움직임 값은 BIBER MOTION KIT 레시피를 웹으로 옮긴 것이다(등장 expo-out · 퇴장 expo-in · 전환 expo-inout, 도착 뒤 관성).
+// 1 관심사 칩(선택 파문) → 「다음」 속으로 줌 스루 → 2 단계 알약 · 브래킷 조준 · 감속 카운트로 20명이 1명
+// → 블러 줌 컷 → 3 기울어진 카드 더미 넘기기(넘기기·슈퍼 좋아요·좋아요) → ♥에서 분홍이 번짐
+// → 4 「매치!」 슬램과 흔들림, 두 사람이 실로 이어짐 → 어둠 속에서 원이 열리며 로고 → 시작하기
 // 화면 왼쪽·오른쪽을 누르면 이전·다음 단계로, ✕나 마지막 「시작하기」로 닫는다. 좌표 단위는 무대 너비 기준 cqw(높이 177.8).
 import { PHOTO_V } from "../core/util.js";
 import { registerOverlay, registerActions, render, pushRoute, backRoute } from "../core/runtime.js";
 import { REDUCE } from "../ui/motion.js";
 import { icon } from "../ui/icons.js";
 import { markSvg, drawMark, MARK_PATH } from "../ui/brand.js";
-import { F, clamp, prog, lerp, lerpLog, tw, E, springAt, S, hitPulse, css, vis, wordsHtml, words, rollHtml, roll, fingerPath, pressScale, playClock } from "../ui/film.js";
+import { F, clamp, prog, lerp, lerpLog, tw, E, K, arrive, inertia, hitPulse, css, vis, wordsHtml, words, rollHtml, roll, fingerPath, pressScale, playClock } from "../ui/film.js";
 
-const CH = [[0, 4.6], [4.6, 9.4], [9.4, 14.3], [14.3, 19]];
-const END = 22.2;
+const CH = [[0, 4.3], [4.3, 10.6], [10.6, 15.2], [15.2, 19.2]];
+const END = 22.3;
 const SEEN_KEY = "guide-seen";
-const MESSAGE = "요즘 어떤 필름 쓰세요?";
 const photo = id => `photos/${id}.jpg?v=${PHOTO_V}`;
 
 let open = false;
@@ -32,59 +32,73 @@ export function openGuideOnce() {
 }
 
 // ---------- 장면 데이터 ----------
+const STEPS = ["관심사를 고르고", "세 번 거르면", "마음을 남기고", "통하면 대화"];   // 왼쪽 위 단계 캡션(동사형)
 const CHIPS = ["등산", "필름카메라", "커피", "러닝", "전시회", "요리", "여행", "독서", "캠핑"];
 const chipPos = i => [22.65 + (i % 3) * 27.6, 66 + Math.floor(i / 3) * 14.5];   // 칩 중심(cqw)
-const TAPS1 = [1.0, 1.45, 2.05];                       // 칩을 누르는 시각: 27·36프레임으로 사람답게 불규칙
-const NEXT_AT = 3.4;
+const TAPS1 = [1.75, 2.25, 2.85];
+const NEXT = { at: 3.6, x: 50, y: 114.5 };             // 「다음」을 누르는 시각과 버튼 중심
+const ZOOM1 = [3.75, 4.3];                             // 「다음」 속으로 줌 스루(expo-in) → 컷
 // 2장: 20명. 단계마다 떨어지는 사람
 const PEOPLE = ["p11", "p01", "p12", "p02", "p13", "p03", "p14", "p04", "p15", "p05", "p16", "p06", "p17", "p07", "p18", "p08", "p19", "p09", "p20", "p10"];
 const OUT1 = new Set(["p01", "p02", "p03", "p04", "p05", "p06", "p07", "p08", "p09", "p10"]);   // 조건
 const OUT2 = new Set(["p11", "p12", "p14", "p17", "p18"]);                                     // 취향
-const STAGES = [6.1, 6.95, 7.5];                       // 단계마다 약 40%씩 빨라진다
-const gridAt = (i, cols, rows, y0) => [50 + ((i % cols) - (cols - 1) / 2) * 16.5, y0 + (Math.floor(i / cols) - (rows - 1) / 2) * 16.5];
+const ST = [5.5, 6.5, 7.5];                            // 조건 · 취향 · 궁합
+const LEFT = [20, 10, 5, 1];
+const gridAt = (i, cols, rows) => [50 + ((i % cols) - (cols - 1) / 2) * 16.5, 80 + (Math.floor(i / cols) - (rows - 1) / 2) * 16.5];
+const BOX = [[79, 62.5], [79, 29.5], [79, 13], [13, 13]];   // 브래킷이 감싸는 크기(남은 사람들)
+const RES = 8.7;                                       // 결과 카드 착지
+const CUT2 = [10.3, 10.6, 11.02];                      // 블러 줌 컷: 나가기 → 들어오기
 // 3장: 맨 위부터
 const DECK = [["p13", "박서준", 29], ["p16", "한지훈", 28], ["p20", "임재원", 27]];
-const SWIPE = [{ at: 9.95, dir: -1, stamp: "no" }, { at: 11.15, dir: 0, stamp: "sup" }, { at: 12.1, dir: 1, stamp: "yes" }];
-const ACT = { x: [28, 50, 72], y: 129 };              // ✕ ★ ♥ (앱과 같은 순서)
-const PEAK = 13.75;                                    // ♥에서 분홍이 터지는 시각
+const SW = [11.5, 12.7, 13.7];                         // 넘기기 · 슈퍼 좋아요 · 좋아요
+const LEAVE = [SW[0] + .45, SW[1] + .06];              // 카드가 더미를 떠나는 시각
+const ACT = { x: [28, 50, 72], y: 138 };               // ✕ ★ ♥ (앱과 같은 순서)
+const PEAK = 14.75;                                    // ♥에서 분홍이 번지는 시각
+// 4장
+const SLAM = 15.45;
+const AV = [[24, 92], [76, 94.2]];                     // 두 사람 = 로고의 두 점 자리
+const BUB = [17.0, 17.9];
+// 끝
+const INK = 19.2, IRIS = [19.35, 20.25], LOGO = 19.45, LINE = 20.4, START = 21.0;
+
+const rippleHtml = (cls, x, y, w, h, r) => `<span class="gd-rip ${cls}" style="left:${x - w / 2}cqw;top:${y - h / 2}cqw;width:${w}cqw;height:${h}cqw;border-radius:${r}"><i></i><i></i>${"<b></b>".repeat(8)}</span>`;
 
 function html() {
   return `
     <div class="gd" aria-label="사용 안내">
       <div class="gd-stage">
-        <div class="gd-cam">
-          <div class="gd-panel"><b class="q">관심사를 골라 주세요</b><span class="cnt">7 / 10</span><span class="track"><i></i></span>
-            <span class="gd-pick">선택 ${rollHtml("gd-pickn")}개</span></div>
+        <div class="gd-sc s1">
+          <div class="gd-panel"><b class="q">관심사를 골라 주세요</b><span class="gd-pick">선택 ${rollHtml("gd-pickn")}개</span></div>
           ${CHIPS.map((c, i) => `<span class="gd-chip" style="left:${chipPos(i)[0]}cqw;top:${chipPos(i)[1]}cqw">${c}</span>`).join("")}
-          <div class="gd-morph">${wordsHtml("다음", "gd-mnext")}</div>
-          <div class="gd-go">${wordsHtml("매칭 시작", "gd-golab")}</div>
-          <div class="gd-steps">${["조건", "취향", "궁합"].map(n => `<span><i></i>${n}</span>`).join("")}</div>
+          ${TAPS1.map((_, i) => rippleHtml("rp-chip", ...chipPos(i), 25, 11, "99px")).join("")}
+          <div class="gd-next">다음</div>
+        </div>
+        <div class="gd-sc s2">
+          <div class="gd-pills"><span class="hl"></span>${["조건", "취향", "궁합"].map(n => `<span class="pl">${n}</span>`).join("")}</div>
+          <div class="gd-count"><span class="n">20</span><small>명</small></div>
+          <div class="gd-res"><span class="who"><b>임재원 · 27</b><small>둘 다 필름카메라로 계절을 기록해요</small></span>
+            <span class="ring"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17"/><circle class="fg" cx="20" cy="20" r="17" pathLength="1" transform="rotate(-90 20 20)"/></svg><b class="score">0</b></span></div>
+          ${rippleHtml("rp-ring", 79, 132, 22, 22, "50%")}
           ${PEOPLE.map(id => `<i class="gd-face" style="background-image:url(photos/thumb/${id}.jpg)"></i>`).join("")}
-          <div class="gd-count">${rollHtml("gd-countn")}<small>명</small></div>
-          <div class="gd-res"><span class="slot"></span><span class="who"><b>임재원 · 27</b><small>둘 다 필름카메라로 계절을 기록해요</small></span>
-            <span class="ring"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17"/><circle class="fg" cx="20" cy="20" r="17" pathLength="1" transform="rotate(-90 20 20)"/></svg>${rollHtml("gd-score")}</span></div>
+          <span class="gd-brk"><i></i><i></i><i></i><i></i></span>
+        </div>
+        <div class="gd-sc s3">
           ${DECK.slice().reverse().map(([id, n, a]) => `<div class="gd-card"><i style="background-image:url(${photo(id)})"></i><b>${n} <small>${a}</small></b><span class="stamp no">넘기기</span><span class="stamp sup">슈퍼 좋아요</span><span class="stamp yes">좋아요</span></div>`).join("")}
-          ${[["x", "넘기기"], ["star-fill", "슈퍼 좋아요"], ["heart-fill", "좋아요"]].map(([n, l], i) => `<div class="gd-act a${i}" style="left:${ACT.x[i]}cqw;top:${ACT.y}cqw"><span>${icon(n, 20)}</span><small>${l}</small></div>`).join("")}
-          <span class="gd-finger"></span>
+          ${[["x", "넘기기"], ["star-fill", "슈퍼 좋아요"], ["heart-fill", "좋아요"]].map(([n, l], i) => `<div class="gd-act a${i}" style="left:${ACT.x[i]}cqw;top:${ACT.y}cqw"><span><em>${icon(n, 20)}</em></span><small>${l}</small></div>`).join("")}
         </div>
         <div class="gd-iris"></div>
-        <div class="gd-match">
+        <div class="gd-sc s4">
+          <b class="gd-slam">매치!</b>
+          <svg class="gd-tie" viewBox="0 0 100 100" style="top:${AV[0][1] - 53.1 * .756}cqw"><path pathLength="1" d="${MARK_PATH}"/></svg>
           <i class="gd-av a" style="background-image:url(${photo("me-f")})"></i><i class="gd-av b" style="background-image:url(${photo("p20")})"></i>
-          <svg class="gd-tie" viewBox="0 0 100 100"><path pathLength="1" d="${MARK_PATH}"/></svg>
-          ${wordsHtml("서로 좋아요,\n대화가 열려요", "gd-mtxt")}
-        </div>
-        <div class="gd-chat">
-          <div class="gd-chead"><i style="background-image:url(${photo("p20")})"></i><b>임재원</b></div>
-          <div class="gd-bub them typing"><i></i><i></i><i></i></div>
           <div class="gd-bub them">안녕하세요! 필름카메라 쓰신다고 봤어요</div>
-          <div class="gd-bub me">${MESSAGE}</div>
-          <div class="gd-comp"><span class="txt"></span><span class="send">${icon("arrow-up", 18)}</span></div>
-          <span class="gd-fly">${MESSAGE}</span>
-          <span class="gd-finger gd-finger2"></span>
+          <div class="gd-bub me">요즘 어떤 필름 쓰세요?</div>
         </div>
-        <div class="gd-end">${markSvg("mark gd-endmark")}${wordsHtml("이제 시작해 볼까요?", "gd-endl")}</div>
-        <div class="gd-thread"><span class="tr"></span><span class="fill"></span>${[1, 2, 3].map(i => `<span class="tick" style="left:${10 + i * 20}cqw"></span>`).join("")}<span class="dot a"></span><span class="dot b"></span></div>
-        ${wordsHtml("관심사만 골라 주세요", "gd-cap c1")}${wordsHtml("세 번 걸러, 한 사람만", "gd-cap c2")}${wordsHtml("넘기고, 마음을 남겨요", "gd-cap c3")}${wordsHtml("통하면 바로 대화", "gd-cap c4")}
+        <div class="gd-ink"></div>
+        <div class="gd-open">${markSvg("mark gd-endmark")}${wordsHtml("이제 시작해 볼까요?", "gd-endl")}</div>
+        <div class="gd-thread"><span class="tr"></span><span class="fill"></span>${[1, 2, 3].map(i => `<span class="tick" style="left:${10 + i * 20}cqw"></span>`).join("")}</div>
+        ${STEPS.map((s, i) => `<span class="gd-step"><b>0${i + 1}</b>${s}</span>`).join("")}
+        <span class="gd-finger"></span>
         <button class="gd-zone prev" data-act="guide-seek:-1" aria-label="이전 단계"></button>
         <button class="gd-zone next" data-act="guide-seek:1" aria-label="다음 단계"></button>
         <button class="gd-close" data-act="guide-close" aria-label="안내 닫기">${icon("x", 18)}</button>
@@ -96,195 +110,189 @@ function html() {
 function grab(root) {
   const q = s => root.querySelector(s), qa = s => [...root.querySelectorAll(s)];
   return {
-    root: q(".gd"), stage: q(".gd-stage"), cam: q(".gd-cam"),
-    panel: q(".gd-panel"), chips: qa(".gd-chip"), pick: q(".gd-pickn"), morph: q(".gd-morph"), mnext: qa(".gd-mnext .mask-in"),
-    go: q(".gd-go"), golab: qa(".gd-golab .mask-in"), steps: q(".gd-steps"), segs: qa(".gd-steps span"),
-    faces: qa(".gd-face"), count: q(".gd-count"), countn: q(".gd-countn"),
-    res: q(".gd-res"), ring: q(".gd-res .fg"), score: q(".gd-score"),
-    cards: qa(".gd-card").reverse(), acts: qa(".gd-act"), finger: q(".gd-cam .gd-finger"),
-    iris: q(".gd-iris"), match: q(".gd-match"), avA: q(".gd-av.a"), avB: q(".gd-av.b"), tie: q(".gd-tie path"), mtxt: qa(".gd-mtxt .mask-in"),
-    chat: q(".gd-chat"), typing: q(".gd-bub.typing"), them: q(".gd-bub.them:not(.typing)"), me: q(".gd-bub.me"),
-    compTxt: q(".gd-comp .txt"), send: q(".gd-comp .send"), fly: q(".gd-fly"), finger2: q(".gd-finger2"),
-    end: q(".gd-end"), endmark: q(".gd-endmark"), endl: qa(".gd-endl .mask-in"), start: q(".gd-start"),
-    track: q(".gd-thread .tr"), fill: q(".gd-thread .fill"), ticks: qa(".gd-thread .tick"), dots: qa(".gd-thread .dot"),
-    caps: [1, 2, 3, 4].map(i => qa(`.gd-cap.c${i} .mask-in`)),
+    root: q(".gd"), stage: q(".gd-stage"), s1: q(".s1"), s2: q(".s2"), s3: q(".s3"), s4: q(".s4"),
+    panel: q(".gd-panel"), chips: qa(".gd-chip"), pick: q(".gd-pickn"), next: q(".gd-next"), chipRips: qa(".gd-rip.rp-chip"),
+    pills: qa(".gd-pills .pl"), hl: q(".gd-pills .hl"), faces: qa(".gd-face"), brk: q(".gd-brk"),
+    count: q(".gd-count"), countn: q(".gd-count .n"), res: q(".gd-res"), ring: q(".gd-res .fg"), score: q(".gd-res .score"), ringRip: q(".gd-rip.rp-ring"),
+    cards: qa(".gd-card").reverse(), acts: qa(".gd-act"), star: q(".gd-act.a1 em"),
+    iris: q(".gd-iris"), slam: q(".gd-slam"), tie: q(".gd-tie path"), avA: q(".gd-av.a"), avB: q(".gd-av.b"), bubs: qa(".gd-bub"),
+    ink: q(".gd-ink"), opener: q(".gd-open"), endmark: q(".gd-endmark"), endl: qa(".gd-endl .mask-in"), start: q(".gd-start"),
+    fill: q(".gd-thread .fill"), thread: q(".gd-thread"), ticks: qa(".gd-thread .tick"), steps: qa(".gd-step"), finger: q(".gd-finger"),
   };
 }
 
-// 카메라: 무대의 (ax, ay)를 화면 (50, 88.9)에 배율 k로 둔다. 앵커는 선형, 배율은 로그로 보간한다
-const CAM = [[0, 50, 88.9, 1], [.7, 50, 88.9, 1], [1.3, 50, 74, 1.3], [2.55, 50, 76, 1.3], [3.1, 50, 88.9, 1],
-  [9.8, 50, 88.9, 1], [10.3, 50, 78, 1.08], [12.6, 50, 78, 1.08], [13.7, 50, 78, 1.1]];
-function camAt(t) {
-  let i = 0;
-  while (i + 1 < CAM.length && t >= CAM[i + 1][0]) i++;
-  if (i + 1 >= CAM.length) return CAM[i].slice(1);
-  const [a, ax, ay, k] = CAM[i], [b, bx, by, k2] = CAM[i + 1], e = E.cam(prog(t, a, b));
-  return [lerp(ax, bx, e), lerp(ay, by, e), lerpLog(k, k2, e)];
+const show = (e, on) => { e.style.display = on ? "" : "none"; };   // 장면 단위 숨김(자식의 visibility가 뚫지 못하게)
+
+// 선택 파문(키트 58): 링 두 겹이 0.18초 간격으로 100→128%, 투명도 0→85→0. 반짝이 8개가 바깥으로 흩어진다
+function ripple(g, t, at) {
+  const [r1, r2, ...sp] = g.children;
+  [r1, r2].forEach((r, j) => {
+    const a = at + j * .18, k = tw(t, a, a + .75, K.expoOut);
+    css(r, { transform: `scale(${lerp(1, 1.28, k)})`, opacity: .85 * prog(t, a, a + .08) * (1 - k) });
+  });
+  const k = tw(t, at, at + .6, K.expoOut);
+  sp.forEach((s, i) => {
+    const ang = i / 8 * 2 * Math.PI + .4, rr = lerp(.9, 1.45, k);
+    css(s, { left: 50 + Math.cos(ang) * 50 * rr + "%", top: 50 + Math.sin(ang) * 50 * rr + "%", transform: `translate(-50%, -50%) scale(${1 - k})`, opacity: t >= at ? 1 - k : 0 });
+  });
 }
-// 이번 프레임에 12px 넘게 움직이면 그만큼 흐리게(움직임 흐림)
-const blurFor = px => (px > 12 ? `blur(${Math.min(8, (px - 12) / 5).toFixed(1)}px)` : "none");
+// 관성 튀기(키트 03): 1 → 1.12 → 1을 0.3초에, 끝에서 살짝 덜 돌아왔다 안착
+const bounce = (t, at, to = .12) => 1 + to * (tw(t, at, at + .15, K.expoOut) - tw(t, at + .15, at + .3, K.smooth)) + inertia(t, at + .3, -to / .15, .06, 2.6, 6.5);
 
 function paint(t, R) {
   savedT = t;
-  const W = R.stage.getBoundingClientRect().width / 100 || 1;     // 1cqw = W px
-  // 배경: 밝음 → (「다음」이 커져) 어두움 → 밝음(박자에 맞춘 컷) → 분홍(♥에서 터짐) → 밝음(대화)
-  const tone = t < 4.22 ? "light" : t < 9.4 ? "dark" : t < 14.3 ? "light" : t < 16.6 ? "pink" : "light";
-  R.root.dataset.tone = t >= 19 ? "light" : tone;
+  const W = R.stage.getBoundingClientRect().width / 100 || 1;      // 1cqw = W px
+  const kb = n => (n > .05 ? `blur(${(n / 10.8 * W).toFixed(1)}px)` : "none");   // 키트의 px(1080 기준) 흐림을 화면 px로
+  R.root.dataset.tone = t < ZOOM1[1] ? "light" : t < CUT2[1] ? "dark" : t < PEAK + .25 ? "light" : t < INK ? "pink" : t < IRIS[0] + .45 ? "dark" : "light";
 
-  // ---- 카메라(1·3장)와 숨쉬기
-  const [ax, ay, k0] = camAt(t);
-  const k = k0 * (1 + .012 * Math.sin(t * 1.3)) * (1 + .012 * hitPulse(t, 15.3, 3 * F, 7 * F));
-  css(R.cam, { transform: `translate(${50 - ax * k}cqw, ${88.9 - ay * k}cqw) scale(${k})` });
-
-  // ---- 1장: 관심사 칩
-  vis(R.panel, t < 4.22);
+  // ---- 1장: 패널이 깊이감 있게 착지(53) → 칩 스태거(04) → 칩을 누를 때마다 튀기(03) + 선택 파문(58)
+  show(R.s1, t < ZOOM1[1]);
+  const zk = K.expoIn(prog(t, ZOOM1[0], ZOOM1[1]));
+  css(R.s1, { transformOrigin: `${NEXT.x}cqw ${NEXT.y}cqw`, transform: `scale(${lerpLog(1, 16, zk)})` });
+  const away = 1 - tw(t, ZOOM1[0], ZOOM1[1] - .2, K.expoIn);       // 버튼 밖은 컷 0.2초 전에 사라진다
+  const land = tw(t, .1, .8, K.expoOut);
+  css(R.panel, { transform: `translateY(${arrive(t, .1, .7, -14.8, 0, .06, 2.6, 6.5)}cqw) scale(${lerp(1.04, 1, land)})`,
+    opacity: tw(t, .1, .3, K.expoOut) * away, boxShadow: `${1.1 * land}cqw ${2.4 * land}cqw ${2.2 + 3 * land}cqw rgba(29, 29, 31, ${.08 + .1 * land})` });
   R.chips.forEach((c, i) => {
-    const at = TAPS1[i] ?? Infinity;
-    c.classList.toggle("on", t >= at + F);
-    c.style.transform = `translate(-50%, -50%) scale(${(1 + .08 * hitPulse(t, at + F, 3 * F, 12 * F)) * pressScale(t, [at])})`;
-    vis(c, t < 4.22);
+    const a = .5 + i * .06, k = tw(t, a, a + 1.1, K.stagger), at = TAPS1[i];
+    c.classList.toggle("on", t >= at);
+    const sc = at ? bounce(t, at) * pressScale(t, [at]) : 1;      // 누르지 않는 칩은 튀지 않는다(Infinity를 넣으면 NaN)
+    css(c, { transform: `translate(-50%, calc(-50% + ${(1 - k) * 5.5}cqw)) scale(${sc})`, filter: kb(14 * (1 - k)), opacity: k * away });
   });
-  roll(R.pick, [[0, 0], [TAPS1[0] + 4 * F, 1], [TAPS1[1] + 4 * F, 2], [TAPS1[2] + 4 * F, 3]], t);
+  R.chipRips.forEach((g, i) => ripple(g, t, TAPS1[i]));
+  roll(R.pick, [[0, 0], ...TAPS1.map((a, i) => [a + 4 * F, i + 1])], t);
+  const nk = tw(t, 1.0, 2.1, K.stagger), ready = tw(t, TAPS1[2] + .1, TAPS1[2] + .4, K.expoOut);
+  css(R.next, { transform: `translate(-50%, calc(-50% + ${(1 - nk) * 5.5}cqw)) scale(${pressScale(t, [NEXT.at])})`, filter: kb(14 * (1 - nk)),
+    opacity: nk * lerp(.3, 1, ready), color: t > ZOOM1[0] ? "transparent" : "" });
 
-  // ---- 「다음」 버튼 → 화면 전체(어두운 배경)로 46프레임 모프
-  const m = tw(t, NEXT_AT + 3 * F, NEXT_AT + 3 * F + 46 * F, E.inOut);
-  const NB = [12, 112, 76, 13, 6.5], FULL = [-10, -10, 120, 200, 0];
-  const [mx, my, mw, mh, mr] = NB.map((v, i) => lerp(v, FULL[i], m));
-  css(R.morph, { left: mx + "cqw", top: my + "cqw", width: mw + "cqw", height: mh + "cqw", borderRadius: mr + "cqw", transform: `scale(${pressScale(t, [NEXT_AT])})` });
-  vis(R.morph, t < 4.6);
-  words(R.mnext, t, .2, { exitAt: NEXT_AT + 2 * F, exitDur: 6 * F });
+  // ---- 2장: 줌 스루로 들어와 0.85 → 1(expo-out). 단계 알약(77) · 브래킷 조준(70) · 감속 카운트(57)
+  show(R.s2, t >= ZOOM1[1] && t < CUT2[1]);
+  const in2 = K.expoOut(prog(t, ZOOM1[1], ZOOM1[1] + .6)), out2 = K.zoomOut(prog(t, CUT2[0], CUT2[1]));
+  css(R.s2, { transform: `scale(${lerp(.85, 1, in2) * lerp(1, 1.12, out2)})`, filter: kb(42 * out2) });
+  R.pills.forEach((p, i) => {
+    const k = tw(t, 4.3 + i * .08, 5.1 + i * .08, K.stagger);
+    css(p, { transform: `translateY(${(1 - k) * 4}cqw)`, filter: kb(14 * (1 - k)), opacity: k * lerp(.32, 1, tw(t, ST[i], ST[i] + .2, K.expoOut)) });
+  });
+  const hx = tw(t, ST[1], ST[1] + .45, K.smooth) + tw(t, ST[2], ST[2] + .45, K.smooth);
+  css(R.hl, { transform: `translateX(${hx * 29}cqw) scale(${lerp(.6, 1, tw(t, ST[0], ST[0] + .35, K.expoOut))})`, opacity: tw(t, ST[0], ST[0] + .15, K.expoOut) });
 
-  // ---- 2장: 매칭 시작 → 단계 막대, 20 → 10 → 5 → 1
-  const goIn = springAt(t - 4.35, S.firm), toBar = tw(t, 5.08, 5.08 + 46 * F, E.inOut);
-  const GO = [20, 52.5, 60, 15, 7.5], BAR = [8, 22, 84, 14, 7];
-  const [gx, gy, gw, gh, gr] = GO.map((v, i) => lerp(v, BAR[i], toBar));
-  css(R.go, { left: gx + "cqw", top: gy + "cqw", width: gw + "cqw", height: gh + "cqw", borderRadius: gr + "cqw",
-    transform: `scale(${lerp(.6, 1, goIn) * pressScale(t, [5.0])})`, background: toBar > .5 ? "#2c2c30" : "" });
-  vis(R.go, t > 4.3 && t < 9.4);
-  words(R.golab, t, 4.45, { exitAt: 5.06, exitDur: 6 * F });
-  vis(R.steps, toBar > .95 && t < 9.4);
-  R.segs.forEach((s, i) => { s.classList.toggle("on", t >= STAGES[i]); s.style.transform = `scale(${1 + .08 * hitPulse(t, STAGES[i], 2 * F, 8 * F)})`; });
-
-  // 단계마다 떨어지는 사람은 접히고(10·6·4프레임), 남은 사람은 새 줄로 옮겨 간다(5x4 → 5x2 → 5x1)
+  // 단계마다: 떨어지는 사람은 흐려지고(14·0.4) 접혀 사라지며, 남은 사람은 새 줄로 옮겨 간다(5x4 → 5x2 → 5x1 → 1)
   const s1 = PEOPLE.filter(id => !OUT1.has(id)), s2 = s1.filter(id => !OUT2.has(id));
   R.faces.forEach((f, i) => {
     const id = PEOPLE[i];
-    const appear = springAt(t - (5.5 + (i % 5) * 4 * F + Math.floor(i / 5) * 6 * F), S.firm);
-    let [x, y] = gridAt(i, 5, 4, 77);
-    const lay = (list, rows, at, dur) => { const j = list.indexOf(id); if (j < 0) return; const [nx, ny] = gridAt(j, 5, rows, 77); const e = tw(t, at, at + dur, E.glide); x = lerp(x, nx, e); y = lerp(y, ny, e); };
-    lay(s1, 2, STAGES[0] + 8 * F, 24 * F);
-    lay(s2, 1, STAGES[1] + 5 * F, 15 * F);
-    const [dAt, dF] = OUT1.has(id) ? [STAGES[0], 10] : OUT2.has(id) ? [STAGES[1], 6] : [STAGES[2], 4];
-    const gone = id === "p20" ? 0 : tw(t, dAt, dAt + dF * F, E.in);   // 마지막 한 사람은 남는다
-    let sc = appear * (1 - gone);
+    const a = 4.35 + (i % 5) * .04 + Math.floor(i / 5) * .06, k = tw(t, a, a + 1.0, K.stagger);
+    let [x, y] = gridAt(i, 5, 4);
+    const lay = (list, rows, s) => { const j = list.indexOf(id); if (j < 0) return; const [nx, ny] = list.length === 1 ? [50, 80] : gridAt(j, 5, rows); const e = tw(t, s + .4, s + 1.0, K.expoInOut); x = lerp(x, nx, e); y = lerp(y, ny, e); };
+    lay(s1, 2, ST[0]); lay(s2, 1, ST[1]); lay(["p20"], 1, ST[2]);
+    const s = OUT1.has(id) ? ST[0] : OUT2.has(id) ? ST[1] : id !== "p20" ? ST[2] : 0;   // 0 = 끝까지 남는 사람
+    const d = s ? tw(t, s, s + .4, K.expoInOut) : 0, gone = s ? tw(t, s + .35, s + .6, K.expoIn) : 0;
+    let sc = 1 - gone;
     // 마지막 한 사람은 결과 카드의 사진 자리로 옮겨 간다(같은 물체가 자리를 옮김)
-    if (id === "p20") { const mv = springAt(t - (STAGES[2] + 4 * F), S.move); x = lerp(x, 20, mv); y = lerp(y, 117, mv); sc *= lerp(1, 1.45, mv); }
-    css(f, { transform: `translate(${x}cqw, ${y}cqw) translate(-50%, -50%) scale(${sc})` });
-    vis(f, t > 5.45 && t < 9.4 && gone < 1);
+    if (id === "p20") { const mv = tw(t, RES + .1, RES + .75, K.expoInOut); x = lerp(x, 20, mv); y = lerp(y, 132, mv); sc *= lerp(1, 1.45, mv); }
+    css(f, { transform: `translate(${x}cqw, calc(${y}cqw + ${(1 - k) * 5.5}cqw)) translate(-50%, -50%) scale(${sc})`,
+      filter: kb(Math.max(14 * (1 - k), 14 * d)), opacity: k * (1 - .6 * d) });
+    vis(f, gone < 1);
   });
-  roll(R.countn, [[0, 20], [STAGES[0] + 10 * F, 10], [STAGES[1] + 6 * F, 5], [STAGES[2] + 4 * F, 1]], t);
-  const cIn = springAt(t - 5.6, S.firm), cOut = tw(t, 7.55, 7.55 + 14 * F, E.in);
-  css(R.count, { transform: `translate(-50%, 0) translateY(${(1 - cIn) * 10 - cOut * 6}cqw)`, opacity: 1 - cOut });
-  vis(R.count, t > 5.55 && t < 9.4);
-  const rIn = springAt(t - 7.62, S.firm);
-  css(R.res, { transform: `translateY(${(1 - rIn) * 30}cqw) scale(${lerp(.94, 1, rIn)})` });
-  vis(R.res, t > 7.6 && t < 9.4);
-  R.ring.style.strokeDashoffset = 1 - .92 * tw(t, 7.9, 8.6, E.out);
-  roll(R.score, [[0, 0], [8.6, 92]], t);
+  // 브래킷: 남은 사람들을 감싸는 상자가 단계마다 expo-inout으로 조여 든다
+  let [bw, bh] = BOX[0];
+  ST.forEach((s, i) => { const e = tw(t, s + .4, s + 1.0, K.expoInOut); bw = lerp(bw, BOX[i + 1][0], e); bh = lerp(bh, BOX[i + 1][1], e); });
+  const pad = 2.2, bIn = tw(t, ST[0] - .3, ST[0], K.expoOut), bOut = tw(t, RES, RES + .25, K.expoIn);
+  css(R.brk, { left: 50 - bw / 2 - pad + "cqw", top: 80 - bh / 2 - pad + "cqw", width: bw + pad * 2 + "cqw", height: bh + pad * 2 + "cqw",
+    opacity: bIn * (1 - bOut), transform: `scale(${lerp(1.15, 1, bIn)})` });
+  // 남은 사람 수: 단계마다 0.5초 감속 카운트, 88 → 100% 커지며
+  let n = LEFT[0], cs = 1;
+  ST.forEach((s, i) => { const e = tw(t, s + .1, s + .6, K.expoOut); if (t >= s + .1) { n = Math.round(lerp(LEFT[i], LEFT[i + 1], e)); cs = lerp(.88, 1, e); } });
+  R.countn.textContent = n;
+  const cIn = tw(t, 4.7, 5.5, K.stagger), cOut = tw(t, RES - .25, RES, K.expoIn);
+  css(R.count, { transform: `translate(-50%, ${(1 - cIn) * 5.5 + cOut * 4}cqw) scale(${cs})`, filter: kb(14 * (1 - cIn)), opacity: cIn * (1 - cOut) });
+  // 결과 카드: 위에서 떨어져 착지(53), 점수 고리가 그려지며(05) 숫자가 함께 올라가고, 끝에 파문
+  const rk = tw(t, RES, RES + .7, K.expoOut);
+  css(R.res, { transform: `translateY(${arrive(t, RES, .7, -14.8, 0, .06, 2.6, 6.5)}cqw) scale(${lerp(1.06, 1, rk)})`, opacity: tw(t, RES, RES + .15, K.expoOut),
+    boxShadow: `${1.1 * rk}cqw ${2.4 * rk}cqw ${2.2 + 3 * rk}cqw rgba(0, 0, 0, ${.2 + .2 * rk})` });
+  const sk = tw(t, 9.3, 10.1, K.expoOut);
+  R.ring.style.strokeDashoffset = 1 - .92 * sk;
+  R.score.textContent = Math.round(92 * sk);
+  ripple(R.ringRip, t, 9.95);
 
-  // ---- 3장: 카드 넘기기 (맨 위부터: 넘기기 → 슈퍼 좋아요 → 좋아요)
+  // ---- 3장: 블러 줌 컷(72)으로 들어온다. 기울어진 카드 더미(44)가 진자처럼 흔들리고, 뒤 카드는 0.055초씩 늦게 따라온다(12)
+  show(R.s3, t >= CUT2[1] && t < PEAK + .6);
+  const in3 = K.zoomIn(prog(t, CUT2[1], CUT2[2]));
+  css(R.s3, { transform: `scale(${lerp(1.08, 1, in3)})`, filter: kb(42 * (1 - in3)) });
   R.cards.forEach((c, i) => {
-    const sw = SWIPE[i], depth = Math.max(0, i - SWIPE.filter(s => t > s.at + .55).length);
-    let dx = 0, dy = 0, rot = 0, lift, speed;
-    if (sw.dir !== 0) {
-      // 들기 14프레임 → 손가락을 따라 휘어 끌기 → 놓으면 화면 밖으로
-      lift = tw(t, sw.at, sw.at + 14 * F, E.out);
-      const drag = tw(t, sw.at + 3 * F, sw.at + .42, E.glide), flyAt = sw.at + .45;
-      const keep = sw.dir > 0;   // 좋아요한 카드는 날아가지 않고 기운 채 멈춘다(절정 직전 숨 멈춤의 주인공)
-      const fly = keep ? 0 : tw(t, flyAt, flyAt + 24 * F, E.in), flyPrev = keep ? 0 : tw(t - F, flyAt, flyAt + 24 * F, E.in);
-      const settle = keep ? tw(t, flyAt, flyAt + 30 * F, E.out) : 0;
-      dx = sw.dir * (drag * 32 + fly * 130 - settle * 14); dy = -drag * 3 + fly * 8; rot = sw.dir * (drag * 9 + fly * 16 - settle * 4);
-      speed = Math.abs(fly - flyPrev) * 130 * W;
-    } else {
-      const flyAt = sw.at + 4 * F, fly = tw(t, flyAt, flyAt + 22 * F, E.in), flyPrev = tw(t - F, flyAt, flyAt + 22 * F, E.in);
-      dy = -fly * 170; lift = tw(t, sw.at, sw.at + 8 * F, E.out); speed = Math.abs(fly - flyPrev) * 170 * W;
+    let depth = i;
+    LEAVE.forEach((L, j) => { if (j < i) { const a = L + .055 * (i - j); depth -= tw(t, a, a + .5, K.expoOut) - inertia(t, a + .5, 1 / .5, .06, 2.6, 6.5); } });
+    const at = SW[i];
+    let dx = 0, dy = 0, rot = 0, ry = 0, lift = tw(t, at, at + .2, K.expoOut);
+    if (i === 1) {                                   // 슈퍼 좋아요: 위로 날아간다
+      const fly = tw(t, at + .06, at + .43, K.expoIn);
+      dy = -fly * 170;
+    } else {                                         // 손가락을 따라 끌었다가 놓는다
+      const drag = tw(t, at + .05, at + .42, K.expoInOut), dir = i === 0 ? -1 : 1;
+      const fly = i === 0 ? tw(t, at + .45, at + .85, K.expoIn) : 0;
+      const settle = i === 2 ? arrive(t, at + .45, .5, 0, 1, .06, 2.6, 6.5) : 0;   // 좋아요한 카드는 기운 채 멈춘다
+      dx = dir * (drag * 30 + fly * 120 - settle * 12); dy = -drag * 2 + fly * 10; rot = dir * (drag * 9 + fly * 14 - settle * 3); ry = dir * fly * 25;
     }
-    css(c, { transform: `translate(${dx}cqw, ${dy + depth * 3.2}cqw) rotate(${rot}deg) scale(${(1 - depth * .05) * (1 + .03 * lift)})`,
-      filter: blurFor(speed), zIndex: 30 - i, boxShadow: `0 ${3 + lift * 3}cqw ${8 + lift * 6}cqw rgba(29, 29, 31, ${.18 + lift * .08})` });
-    c.querySelector("." + sw.stamp).style.opacity = tw(t, sw.at + .1, sw.at + .3, E.ui);
-    vis(c, t >= 9.4 && t < 14.3);
+    const sway = 3 * Math.sin(2 * Math.PI * (t / 4.6 + i / 3)) * (1 - lift);
+    css(c, { transform: `translate(${dx}cqw, ${dy + depth * 3.2}cqw) translateZ(${-depth * 6}cqw) rotateX(4deg) rotateY(${sway + ry}deg) rotate(${rot}deg) scale(${(1 - depth * .05) * (1 + .03 * lift)})`,
+      zIndex: 30 - i, boxShadow: `${1.1 + .4 * lift}cqw ${2.4 + 1.2 * lift}cqw ${2.2 + 2 * lift}cqw rgba(29, 29, 31, ${.2 + .12 * lift - depth * .05})` });
+    c.querySelector(".stamp." + ["no", "sup", "yes"][i]).style.opacity = tw(t, at + .1, at + .3, K.expoOut);
   });
+  const ACT_AT = [LEAVE[0], SW[1], SW[2] + .45];
   R.acts.forEach((a, i) => {
-    const at = [SWIPE[0].at + .45, SWIPE[1].at, SWIPE[2].at + .45][i];
-    a.classList.toggle("hot", t >= at && (i === 2 || t < at + .6));
-    a.style.transform = `translate(-50%, -50%) scale(${(1 + .14 * hitPulse(t, at, 2 * F, 10 * F)) * (i === 1 ? pressScale(t, [SWIPE[1].at]) : 1)})`;
-    vis(a, t >= 9.4 && t < 14.3);
+    const k = tw(t, 10.8 + i * .07, 11.6 + i * .07, K.stagger);
+    a.classList.toggle("hot", t >= ACT_AT[i] && (i === 2 || t < ACT_AT[i] + .6));
+    css(a, { transform: `translate(-50%, calc(-50% + ${(1 - k) * 5.5}cqw)) scale(${(1 + .14 * hitPulse(t, ACT_AT[i], 2 * F, 10 * F)) * (i === 1 ? pressScale(t, [SW[1]]) : 1)})`, opacity: k });
+  });
+  // ★ 스쿼시(11): 눌리는 순간 132×70 → 92×112 → 100×100
+  const q1 = tw(t, SW[1], SW[1] + .08, K.expoOut), q2 = tw(t, SW[1] + .08, SW[1] + .22, K.expoOut), q3 = tw(t, SW[1] + .22, SW[1] + .45, K.expoOut);
+  R.star.style.transform = `scale(${lerp(lerp(lerp(1, 1.32, q1), .92, q2), 1, q3)}, ${lerp(lerp(lerp(1, .7, q1), 1.12, q2), 1, q3)})`;
+
+  // ---- 절정: ♥ 버튼에서 분홍이 번진다(expo-inout)
+  const ir = tw(t, PEAK, PEAK + .5, K.expoInOut);
+  css(R.iris, { clipPath: `circle(${lerpLog(.5, 210, ir)}cqw at ${ACT.x[2]}cqw ${ACT.y}cqw)` });
+  show(R.iris, t > PEAK && t < INK);
+
+  // ---- 4장: 「매치!」만 슬램(84) — 0.1초에 140 → 100%, 장면 전체가 0.4초 감쇠 흔들림
+  show(R.s4, t >= PEAK + .45 && t < INK);
+  const tau = t - SLAM, shake = tau >= 0 && tau < .4 ? 1.48 * Math.exp(-14 * tau) : 0;   // 16px(1080 기준)
+  css(R.s4, { transform: `translate(${shake * Math.sin(70 * tau)}cqw, ${shake * Math.cos(83 * tau)}cqw)` });
+  css(R.slam, { transform: `translate(-50%, -50%) scale(${lerp(1.4, 1, tw(t, SLAM, SLAM + .1, K.slam))})`, opacity: t >= SLAM ? 1 : 0 });
+  // 두 사람이 양옆에서 들어와 관성으로 안착 → 실이 이어지고 → 닿는 순간 살짝 찌그러진다
+  const tieEnd = 16.6, sq = t >= tieEnd && t < tieEnd + 8 * F ? 1 - E.soft((t - tieEnd) / (8 * F)) : 0;
+  css(R.avA, { transform: `translate(${arrive(t, 15.6, .6, -30, AV[0][0], .06, 2.6, 6.5)}cqw, ${AV[0][1]}cqw) translate(-50%, -50%)` });
+  css(R.avB, { transform: `translate(${arrive(t, 15.66, .6, 130, AV[1][0], .06, 2.6, 6.5)}cqw, ${AV[1][1]}cqw) translate(-50%, -50%) scale(${1 + .08 * sq}, ${1 - .1 * sq})` });
+  const tied = tw(t, 16.1, tieEnd, E.glide);
+  css(R.tie, { strokeDashoffset: 1 - tied, opacity: tied > 0 ? 1 : 0 });   // 그리기 전엔 둥근 끝이 점으로 찍히지 않게
+  R.bubs.forEach((b, i) => {
+    css(b, { transform: `translateY(${arrive(t, BUB[i], .35, 3, 0, .04)}cqw) scale(${arrive(t, BUB[i], .35, .6, 1, .04)})`, opacity: tw(t, BUB[i], BUB[i] + .12, K.expoOut) });
   });
 
-  // ---- 손가락: 휘어서 움직이고, 누르기 6프레임 전 잠깐 커졌다가 눌린다. 제품이 스스로 움직이기 시작하면 사라진다
-  const FK = [[0, 86, 190], [.55, 86, 190], [TAPS1[0], ...chipPos(0)], [TAPS1[1], ...chipPos(1)], [TAPS1[2], ...chipPos(2)], [NEXT_AT, 50, 118.5], [3.9, 70, 190],
-    [4.55, 70, 190], [5.0, 50, 60], [5.4, 60, 70],
-    [9.6, 80, 190], [SWIPE[0].at, 52, 70], [SWIPE[0].at + .42, 22, 68], [SWIPE[1].at, ACT.x[1], ACT.y], [SWIPE[2].at, 50, 70], [SWIPE[2].at + .42, 80, 68], [12.9, 84, 190]];
+  // ---- 끝: 어둠으로 컷 → 원이 열리며(85) 밝은 면 안에서 로고가 그려지고(05) → 시작하기(스냅 + 관성)
+  show(R.ink, t >= INK);
+  const io = K.iris(prog(t, IRIS[0], IRIS[1]));
+  css(R.opener, { clipPath: `circle(${lerp(0, 106.5, io)}cqw at 50cqw 88.9cqw)` });
+  show(R.opener, t >= IRIS[0]);
+  drawMark(R.endmark, Math.max(t, LOGO), LOGO, { slow: .7 });
+  words(R.endl, t, LINE);
+  const sk2 = tw(t, START, START + .3, K.snap);
+  css(R.start, { transform: `translate(-50%, ${(1 - sk2) * 6}cqw) scale(${arrive(t, START, .3, .9, 1)})`, opacity: sk2 });
+  vis(R.start, t >= START);
+
+  // ---- 위쪽 진행 실과 왼쪽 위 단계 캡션(59): 24px 왼쪽에서 0.35초 expo-out, 장면 끝 0.2초 전에 빠진다
+  R.fill.style.transform = `scaleX(${clamp(t / INK)})`;
+  R.ticks.forEach((tk, i) => { const at = CH[i + 1][0]; tk.classList.toggle("on", t >= at); tk.style.transform = `translate(-50%, -50%) scale(${1 + .6 * hitPulse(t, at, 2 * F, 10 * F)})`; });
+  show(R.thread, t < INK);
+  R.steps.forEach((s, i) => {
+    const [a, b] = CH[i], k = tw(t, a + .15, a + .5, K.expoOut), o = tw(t, b - .4, b - .2, K.expoIn);
+    css(s, { transform: `translateX(${(1 - k) * -2.2 - o * 1}cqw)`, opacity: k * (1 - o) });
+  });
+
+  // ---- 손가락: 휘어서 움직이고, 누르기 직전 커졌다가 눌린다
+  const FK = [[0, 86, 190], [1.3, 86, 190], [TAPS1[0], ...chipPos(0)], [TAPS1[1], ...chipPos(1)], [TAPS1[2], ...chipPos(2)], [NEXT.at, NEXT.x, NEXT.y], [ZOOM1[0] + .1, 70, 190],
+    [10.9, 80, 190], [SW[0], 52, 80], [SW[0] + .42, 22, 78], [SW[1], ACT.x[1], ACT.y], [SW[2], 50, 80], [SW[2] + .42, 80, 78], [14.5, 84, 190]];
   const [fx, fy] = fingerPath(t, FK);
-  const fFade = t > 5.25 ? 1 - prog(t, 5.25, 5.25 + 10 * F) : 1;
-  css(R.finger, { left: fx + "cqw", top: fy + "cqw", opacity: fFade,
-    transform: `translate(-50%, -50%) scale(${pressScale(t, [...TAPS1, NEXT_AT, 5.0, SWIPE[0].at, SWIPE[1].at, SWIPE[2].at])})` });
-  vis(R.finger, (t > .55 && t < 3.95) || (t > 4.55 && t < 5.25 + 10 * F) || (t > 9.6 && t < 12.95));
-
-  // ---- 절정: 숨 멈춤 뒤 ♥ 버튼에서 분홍이 32프레임 동안 터진다 → 두 사람 사이에 실이 이어진다
-  const hb = R.acts[2].getBoundingClientRect(), sb = R.stage.getBoundingClientRect();
-  const hx = (hb.left + hb.width / 2 - sb.left) / W, hy = (hb.top + hb.height / 2 - sb.top) / W;
-  const ir = tw(t, PEAK, PEAK + 32 * F, E.inOut);
-  css(R.iris, { clipPath: `circle(${lerpLog(.5, 210, ir)}cqw at ${hx}cqw ${hy}cqw)` });
-  vis(R.iris, t > PEAK && t < 16.6);
-  const zOut = tw(t, 16.4, 16.4 + 12 * F, E.in);                 // 확대하며 빠진다(줌스루)
-  css(R.match, { transform: `scale(${1 + .2 * zOut})`, filter: zOut > 0 ? `blur(${(zOut * 10).toFixed(1)}px)` : "none" });
-  vis(R.match, t > 14.25 && t < 16.6);
-  const avIn = tw(t, 14.35, 14.35 + 30 * F, E.glide);
-  const sq = t >= 15.3 && t < 15.3 + 8 * F ? 1 - E.soft((t - 15.3) / (8 * F)) : 0;      // 실이 닿는 순간
-  css(R.avA, { transform: `translate(${lerp(-40, 24, avIn)}cqw, 70cqw) translate(-50%, -50%)` });
-  css(R.avB, { transform: `translate(${lerp(140, 76, avIn)}cqw, 72.1cqw) translate(-50%, -50%) scale(${1 + .08 * sq}, ${1 - .1 * sq})` });
-  R.tie.style.strokeDashoffset = 1 - tw(t, 14.8, 15.3, E.glide);
-  words(R.mtxt, t, 15.0);
-
-  // ---- 대화: 작게 있다가 30프레임에 걸쳐 들어온다 → 상대 인사 → 직접 입력 → 보낸 글이 말풍선으로 옮겨 간다
-  const chatOn = t >= 16.6 && t < 19.1;
-  css(R.chat, { transform: `scale(${lerp(.75, 1, tw(t, 16.6, 16.6 + 30 * F, E.out))})`, opacity: chatOn ? 1 : 0 });
-  vis(R.chat, chatOn);
-  vis(R.typing, chatOn && t > 16.95 && t < 17.3);
-  R.typing.querySelectorAll("i").forEach((d, i) => { d.style.transform = `translateY(${-1.2 * Math.max(0, Math.sin(t * 7 - i * .8))}cqw)`; });
-  const sThem = springAt(t - 17.3, S.firm);
-  css(R.them, { transform: `translateY(${(1 - sThem) * 6}cqw) scale(${lerp(.92, 1, sThem)})` });
-  vis(R.them, chatOn && t > 17.3);
-  const typed = Math.floor(clamp((t - 17.75) / (2 * F), 0, MESSAGE.length));           // 2프레임에 한 글자
-  R.compTxt.textContent = t >= 17.75 && t < 18.5 ? MESSAGE.slice(0, typed) : "메시지 보내기";
-  R.compTxt.classList.toggle("filled", t >= 17.75 && t < 18.5);
-  R.send.style.transform = `scale(${pressScale(t, [18.5])})`;
-  const mv = springAt(t - 18.5, S.move);
-  css(R.fly, { transform: `translate(${lerp(0, 42, mv)}cqw, ${lerp(0, -80, mv)}cqw)` });
-  vis(R.fly, chatOn && t >= 18.5 && mv < .98);
-  vis(R.me, chatOn && t >= 18.5 && mv >= .98);
-  const [gx2, gy2] = fingerPath(t, [[17.3, 80, 190], [17.62, 40, 147], [18.5, 87.5, 147], [18.9, 80, 190]]);
-  css(R.finger2, { left: gx2 + "cqw", top: gy2 + "cqw", transform: `translate(-50%, -50%) scale(${pressScale(t, [17.62, 18.5])})` });
-  vis(R.finger2, t > 17.3 && t < 18.85);
-
-  // ---- 위쪽 실(진행) → 마지막에 두 점이 가운데로 와서 로고를 그린다(첫 화면과 같은 동작)
-  R.fill.style.transform = `scaleX(${clamp(t / CH[3][1])})`;
-  R.ticks.forEach((tk, i) => { const at = CH[i + 1][0]; tk.classList.toggle("on", t >= at); tk.style.transform = `translate(-50%, -50%) scale(${1 + .6 * hitPulse(t, at, 2 * F, 10 * F)})`; vis(tk, t < 19); });
-  vis(R.track, t < 19); vis(R.fill, t < 19);
-  const gather = tw(t, 19, 19 + 36 * F, E.inOut);
-  R.dots.forEach((d, i) => {
-    css(d, { transform: `translate(${lerp(i ? 90 : 10, i ? 70.7 : 29.4, gather)}cqw, ${lerp(9, 72, gather)}cqw) translate(-50%, -50%) scale(${lerp(1, 2.2, gather)})` });
-    vis(d, gather < 1);
-  });
-  vis(R.end, t >= 19.6);
-  drawMark(R.endmark, Math.max(t, 19.6), 19.0, { slow: .7 });
-  words(R.endl, t, 20.2);
-  css(R.start, { transform: `translate(-50%, ${(1 - springAt(t - 20.6, S.firm)) * 40}cqw)` });
-  vis(R.start, t > 20.6);
-
-  // ---- 장면 설명(아래쪽, 5단어 이하)
-  [[.25, 3.9], [4.75, 9.15], [9.5, 13.55], [17.0, 18.9]].forEach(([a, b], i) => words(R.caps[i], t, a, { exitAt: b }));
+  css(R.finger, { left: fx + "cqw", top: fy + "cqw", transform: `translate(-50%, -50%) scale(${pressScale(t, [...TAPS1, NEXT.at, ...SW])})` });
+  vis(R.finger, (t > 1.3 && t < ZOOM1[0] + .1) || (t > 10.9 && t < 14.5));
 }
 
 registerOverlay("guide", {
