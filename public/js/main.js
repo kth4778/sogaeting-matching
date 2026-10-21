@@ -1,4 +1,4 @@
-// 앱 시작점: 화면 그리기 규약(render), 클릭 위임, 탭바(배지·스크롤 기억), 가상 폰 크기, 키보드 높이, 스플래시
+// 앱 시작점: 화면 그리기 규약(render), 클릭 위임, 탭바(배지·스크롤 기억), 가상 폰 크기, 키보드 높이, 시작
 // 화면 모듈을 불러오면 각자 registerScreen·registerOverlay·registerActions로 등록된다 (오버레이 우선순위 = 불러온 순서)
 import "./screens/onboarding.js";
 import "./screens/guide.js";
@@ -7,17 +7,15 @@ import "./screens/cards.js";
 import "./screens/detail.js";
 import "./screens/chat.js";
 import "./screens/profile.js";
-import { $, sleep } from "./core/util.js";
+import { $ } from "./core/util.js";
 import { state } from "./core/store.js";
 import { setRenderer, render as rerender, registerActions, dispatch, screens, overlays, dropRoute } from "./core/runtime.js";
 import { bootLog, renderPipeline } from "./core/log.js";
 import { signature } from "./core/engine.js";
 import { unreadTotal } from "./screens/chat.js";
 import { REDUCE, DUR, EASE } from "./ui/motion.js";
-import { markSvg } from "./ui/brand.js";
 
 const MOBILE_Q = "(max-width: 760px), (hover: none) and (pointer: coarse)";
-const SPLASH_MAX_MS = 2200, SPLASH_MIN_MS = 1500, SPLASH_OUT_MS = 300; // 로고 선이 다 그려지고 이름이 올라올 때까지(약 1.2초)
 
 // ---------- 화면 그리기 ----------
 // 규약(명세 §6.1): ① 화면 키(탭/대화 상대)가 바뀌면 이전 unmount → className 초기화 → 새로 그림 → mount → 컨테이너 페이드
@@ -145,40 +143,11 @@ if (vv) {
 // iOS에서 :active 누름 효과가 켜지게
 document.addEventListener("touchstart", () => {}, { passive: true });
 
-// ---------- 스플래시 ----------
+// ---------- 시작 ----------
+// 따로 띄우는 스플래시는 없다. 첫 화면 소개 영상(ui/brand.js)이 로고를 그리는 장면으로 시작한다.
 function endBoot() {
   document.body.classList.remove("booting");
   window.dispatchEvent(new Event("splash:done"));
-}
-function standalone() {
-  return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-}
-async function showSplash() {
-  let booted = false;
-  try { booted = sessionStorage.getItem("booted") === "1"; sessionStorage.setItem("booted", "1"); } catch {}
-  if (state.me || booted || standalone() || REDUCE) { endBoot(); return; }
-
-  const splash = document.createElement("div");
-  splash.className = "splash";
-  splash.innerHTML = `${markSvg()}<h1 class="mask"><span class="mask-in">오늘, 누구와?</span></h1>`;
-  $(".phone-screen").append(splash);
-  const t0 = performance.now();
-  let done = false;
-  const close = () => {
-    if (done) return;
-    done = true;
-    splash.classList.add("out");
-    endBoot();
-    setTimeout(() => splash.remove(), SPLASH_OUT_MS);
-  };
-  splash.addEventListener("pointerdown", close);
-  const hero = $("#overlay img");
-  await Promise.race([
-    Promise.all([document.fonts.ready, hero?.decode?.().catch(() => {})]),
-    sleep(SPLASH_MAX_MS),
-  ]);
-  await sleep(Math.max(0, SPLASH_MIN_MS - (performance.now() - t0)));
-  close();
 }
 
 // ---------- 오프라인 캐시 (https 배포에서만) ----------
@@ -192,4 +161,4 @@ fitPhone();
 bootLog();
 renderPipeline();
 render();
-showSplash();
+endBoot();

@@ -6,7 +6,7 @@ import { registerOverlay, registerActions, render, pushRoute, backRoute } from "
 import { toast } from "../ui/toast.js";
 import { openSheet } from "../ui/sheet.js";
 import { pauseOffscreen, DUR, EASE, REDUCE } from "../ui/motion.js";
-import { playWelcomeHero } from "../ui/brand.js";
+import { playIntro } from "../ui/brand.js";
 import { openGuideOnce } from "./guide.js";
 import {
   STEPS as OB_STEPS, INTEREST_MAX, PHOTO_MAX, MBTI_UNKNOWN, CONSENTS, TEXT_RULE,
@@ -248,16 +248,15 @@ let lastObStep = null;
 let stopHero = null;
 let lastRatio = null;
 function startHero(overlay) {
-  const hero = overlay.querySelector(".hero");
-  if (!hero) return;
-  // 스플래시가 로고를 그리고 있었으면 히어로는 그 다음 장면부터 이어 간다
-  const drawn = document.body.classList.contains("booting");
+  const welcome = overlay.querySelector(".ob.welcome");
+  if (!welcome) return;
+  const hero = welcome.querySelector(".intro");
   const go = () => {
     stopHero?.();
-    const unpause = pauseOffscreen(hero), stopFilm = playWelcomeHero(hero, { drawn });
+    const unpause = pauseOffscreen(hero), stopFilm = playIntro(welcome);
     stopHero = () => { unpause(); stopFilm(); };
   };
-  if (drawn) {
+  if (document.body.classList.contains("booting")) {
     hero.classList.add("paused");
     window.addEventListener("splash:done", () => { hero.classList.remove("paused"); if (hero.isConnected) go(); }, { once: true });
   } else go();
