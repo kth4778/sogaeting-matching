@@ -1,7 +1,7 @@
 import { SAMPLE_PROFILES } from "../data/profiles.js";
 import { esc, meSrc } from "../core/util.js";
 import { icon } from "../ui/icons.js";
-import { heroHtml } from "../ui/brand.js";
+import { introHtml } from "../ui/brand.js";
 
 // 처음 시작할 때 한 화면에 질문 하나씩 묻는 가입 흐름.
 // 여기서 모은 칸이 그대로 매칭 로직의 입력(내 프로필 + 이상형 조건)이 된다.
@@ -179,22 +179,6 @@ function bodyHtml(step, d, ob) {
   return "";
 }
 
-// 웰컴 히어로(모션 그래픽은 ui/brand.js) + 서비스 소개 3장
-export function welcomeHeroHtml() {
-  const STORY = [
-    ["intro-1.jpg", "조건부터 서로 맞춰 봐요", "나이·흡연·종교, 서로의 조건이 맞는 사람만 남겨요"],
-    ["intro-2.jpg", "취향이 닮은 사람을 찾아요", "등산과 산 타기처럼 말이 달라도 같은 취향을 알아봐요"],
-    ["intro-3.jpg", "왜 잘 맞는지 알려드려요", "점수만이 아니라 이유와 첫 만남 제안까지"],
-  ];
-  return `${heroHtml()}
-        <div class="story">
-          <div class="story-track">${STORY.map(([img, title, desc]) => `
-            <div class="story-card"><img src="${img}" alt=""><div><b>${title}</b><p>${desc}</p></div></div>`).join("")}
-          </div>
-          <div class="story-dots"><i></i><i></i><i></i></div>
-        </div>`;
-}
-
 // 완료 화면의 요약 행: [라벨, 값, 단계 key]
 function summaryRows(d) {
   const w = d.wants;
@@ -247,7 +231,7 @@ export function onboardingHtml(ob) {
     const resume = ob.resume;
     return `
       <div class="ob welcome enter-${dir}">
-        ${welcomeHeroHtml()}
+        ${introHtml()}
         <div class="ob-foot">
           ${resume
             ? `<button class="btn" data-act="ob-resume">이어서 만들기 (${stepNo(STEPS[resume].key) || INPUT_STEPS.length}/${INPUT_STEPS.length})</button>`
