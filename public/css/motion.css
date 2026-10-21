@@ -1,0 +1,46 @@
+/* motion.css — 여러 화면이 같이 쓰는 @keyframes·오버레이 진입·reduced-motion·.paused (화면 전용 keyframes는 각 화면 파일) */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeOut { to { opacity: 0; } }
+@keyframes toastIn { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes toastOut { to { opacity: 0; transform: translate(-50%, 6px); } }
+@keyframes installIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes sheetUp { from { transform: translateY(calc(100% + var(--safe-b) + 8px)); } to { transform: none; } }
+@keyframes sheetDown { to { transform: translateY(calc(100% + var(--safe-b) + 8px)); } }
+@keyframes noticeIn { from { transform: translateY(-120%); } to { transform: none; } }
+@keyframes noticeOut { to { opacity: 0; transform: translateY(-120%); } }
+@keyframes pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: none; } }
+@keyframes tap { 50% { transform: scale(.92); } }
+@keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+@keyframes bubbleIn { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes typingDot { 0%, 60%, 100% { transform: none; opacity: .5; } 30% { transform: translateY(-4px); opacity: 1; } }
+@keyframes kenburns { to { transform: scale(1.09) translate(-1%, -1%); } }
+@keyframes petal { 0% { translate: 0 0; rotate: 0deg; opacity: 0; } 10% { opacity: 1; } 100% { translate: 40px 600px; rotate: 300deg; opacity: 0; } }
+@keyframes beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.25); } 30% { transform: scale(.95); } 45% { transform: scale(1.12); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes splashPop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+@keyframes splashOut { to { opacity: 0; } }
+@keyframes badgePop { 0% { transform: scale(0); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+@keyframes rollIn { from { opacity: 0; transform: translateY(60%); } to { opacity: 1; transform: none; } }
+@keyframes rollOut { to { opacity: 0; transform: translateY(-60%); } }
+
+/* 옛 keyframes: 아직 화면 파일이 참조함(각 WP가 자기 접두사 이름으로 옮기면 통합 정리에서 삭제) */
+@keyframes enterFwd { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes enterBack { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+@keyframes counter { to { rotate: -360deg; } }
+@keyframes counter-rev { to { rotate: 360deg; } }
+@keyframes bob { 50% { translate: 0 -5px; } }
+@keyframes breathe { 50% { transform: scale(1.04); } }
+@keyframes pairL { 0%, 100% { transform: translateX(-26px); opacity: .6; } 30%, 80% { transform: none; opacity: 1; } }
+@keyframes pairR { 0%, 100% { transform: translateX(26px); opacity: .6; } 30%, 80% { transform: none; opacity: 1; } }
+@keyframes draw { 0%, 25% { stroke-dashoffset: 140; } 45%, 80% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -140; } }
+@keyframes storySlide { 0%, 28% { transform: none; } 33%, 61% { transform: translateX(-100%); } 66%, 94% { transform: translateX(-200%); } 100% { transform: none; } }
+@keyframes dot { 0%, 30% { width: 18px; background: var(--pink-500); } 34%, 100% { width: 6px; background: var(--gray-200); } }
+
+.enter-fwd { animation: enterFwd var(--m-slow) var(--e-nav); }
+.enter-back { animation: enterBack var(--m-slow) var(--e-nav); }
+.paused, .paused * { animation-play-state: paused !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

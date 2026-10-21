@@ -76,6 +76,8 @@ function toTurns(history) {
     if (turns.at(-1)?.role === role) turns.at(-1).content += `\n${m.text}`;
     else turns.push({ role, content: m.text });
   }
+  // 대화는 user 차례로 시작해야 한다
+  while (turns[0]?.role === "assistant") turns.shift();
   return turns;
 }
 

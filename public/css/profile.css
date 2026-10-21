@@ -1,0 +1,41 @@
+/* profile.css — 내 정보 (WP5) */
+.me-av { width: 44px; height: 44px; border-radius: 50%; background: var(--pink-50); color: var(--pink-500); display: grid; place-items: center; font-weight: 700; }
+.me-av.big { width: 88px; height: 88px; font-size: 32px; margin: 0 auto 10px; border: 3px solid #fff; box-shadow: var(--sh-2); }
+.me-av.photo { background-size: cover; background-position: center; }
+.me-appbar-edit { display: grid; place-items: center; min-width: 44px; height: 44px; font-size: 15px; font-weight: 600; color: var(--text-brand); }
+.me-top { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 8px 16px 12px; }
+.me-photo { position: relative; width: 104px; height: 104px; display: grid; place-items: center; margin-bottom: 10px; }
+.me-photo .me-av.big { margin: 0; }
+.me-ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.me-ring circle { fill: none; stroke-width: 4; }
+.me-ring-bg { stroke: var(--gray-100); }
+.me-ring-fg { stroke: var(--pink-500); stroke-linecap: round; }
+.me-top h3 { font-size: 24px; font-weight: 700; letter-spacing: -.02em; color: var(--text-1); }
+.me-sub { font-size: 14px; color: var(--text-2); margin-top: 2px; }
+.me-pct { font-size: 13px; font-weight: 600; color: var(--text-brand); margin-top: 10px; font-variant-numeric: tabular-nums; }
+.me-hint { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.me-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; margin-top: 16px; }
+.me-btn { height: 44px; font-size: 15px; }
+.me-card { margin: 12px 16px; padding: 4px 16px; border-radius: var(--r-lg); background: var(--card-bg); box-shadow: var(--card-shadow); }
+.me-card-head { display: flex; align-items: center; justify-content: space-between; height: 44px; }
+.me-card-head h4 { font-size: 13px; font-weight: 600; color: var(--text-3); }
+.me-edit { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--text-brand); }
+.me-card-sub { font-size: 12px; color: var(--text-3); margin: -6px 0 4px; }
+.me-text { font-size: 15px; line-height: 1.6; color: var(--text-1); padding-bottom: 8px; }
+.me-text.sub { color: var(--text-2); padding-bottom: 12px; }
+.me-chips { padding-bottom: 8px; }
+.me-row { display: flex; align-items: center; justify-content: space-between; min-height: 48px; font-size: 15px; box-shadow: inset 0 0.5px 0 var(--hairline); }
+.me-row span { color: var(--text-2); }
+.me-row b { font-weight: 600; color: var(--text-1); }
+.me-list { padding: 0; overflow: hidden; }
+.me-list .list-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 52px; padding: 0 16px; font-size: 15px; color: var(--text-1); text-align: left; text-decoration: none; position: relative; border-bottom: 0; }
+.me-list .list-row + .list-row::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: 0.5px; background: var(--hairline); }
+.me-list .list-row span { flex: 1; }
+.me-list .list-row em { font-style: normal; font-size: 14px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.me-list .list-row .i { color: var(--gray-300); }
+.me-list .list-row.danger { color: var(--danger); }
+.me-list .list-row:active { background: var(--surface-sunken); }
+.me-foot { font-size: 12px; color: var(--text-3); text-align: center; padding: 8px 16px 24px; }
+.me-preview { height: 100%; display: flex; flex-direction: column; padding: 4px var(--gutter) 16px; background: var(--bg-screen); }
+.me-preview-top { display: flex; align-items: center; justify-content: space-between; height: 44px; font-size: 16px; font-weight: 600; color: var(--text-1); }
+.me-preview-card { position: relative; flex: 1; min-height: 0; margin-top: 8px; }

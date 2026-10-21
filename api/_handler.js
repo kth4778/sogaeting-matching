@@ -31,11 +31,15 @@ export function handle(path) {
     if (req.method === "OPTIONS") return res.status(204).end();
     if (req.method !== "POST") return res.status(405).json({ error: "POST만 받습니다." });
     const ip = String(req.headers["x-forwarded-for"] ?? "unknown").split(",")[0];
-    if (overLimit(ip)) return res.status(429).json({ error: "요청이 너무 많아요. 1분 뒤 다시 시도하세요." });
+    if (overLimit(ip)) return res.status(429).json({ error: "rate" });
 
     const body = req.body ?? {};
     if (JSON.stringify(body).length > MAX_BODY_BYTES) return res.status(413).json({ error: "요청이 너무 큽니다." });
-    if (Array.isArray(body.history)) body.history = body.history.slice(-MAX_CHAT_TURNS);
+    if (Array.isArray(body.history)) {
+      body.history = body.history.slice(-MAX_CHAT_TURNS);
+      // 자른 기록이 상대 말로 시작하면 하나 더 버린다 (대화는 내 말로 시작해야 한다)
+      if (body.history[0]?.from === "them") body.history.shift();
+    }
     if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: "서버에 ANTHROPIC_API_KEY가 설정되지 않았습니다." });
 
     const started = Date.now();
@@ -44,7 +48,7 @@ export function handle(path) {
       res.status(200).json({ ...result, model: MODEL, ms: Date.now() - started });
     } catch (err) {
       const [status, message] = toErrorMessage(err);
-      res.status(status).json({ error: message });
+      res.status(status).json({ error: status === 429 ? "rate" : message });
     }
   };
 }
