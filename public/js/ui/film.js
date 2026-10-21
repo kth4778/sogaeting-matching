@@ -32,7 +32,30 @@ export const E = {
   contact: bezier(.55, 0, .9, .55),  // 속도를 유지한 채 부딪치며 도착
   linear: p => p,
 };
+// BIBER MOTION KIT 프리셋(속도 0 + 영향력 → cubic-bezier). 등장 expo-out, 퇴장 expo-in, 전환 expo-inout
+export const K = {
+  expoOut: bezier(.06, 0, .08, 1),
+  expoIn: bezier(.92, 0, .94, 1),
+  expoInOut: bezier(.88, 0, .12, 1),
+  smooth: bezier(.6, 0, .4, 1),
+  snap: bezier(.03, 0, .02, 1),
+  stagger: bezier(.6, 0, .15, 1),
+  zoomOut: bezier(.4, 0, .92, 1),    // 블러 줌 컷: 나가는 장면
+  zoomIn: bezier(.1, 0, .08, 1),     // 블러 줌 컷: 들어오는 장면
+  slam: bezier(.03, 0, .05, 1),
+  iris: bezier(.55, 0, .2, 1),
+};
 export const tw = (t, a, b, ease = E.out) => ease(prog(t, a, b));
+// 관성: 마지막 키 뒤 감쇠하는 사인파. v = 평균 속도(변화량/시간), amp·freq·decay는 키트 기본값(0.05, 2.4, 6)
+export function inertia(t, end, v, amp = .05, freq = 2.4, decay = 6) {
+  const tau = t - end;
+  if (tau <= 0 || tau > 1.2) return 0;
+  return v * amp * Math.sin(2 * Math.PI * freq * tau) / Math.exp(decay * tau);
+}
+// 도착 + 관성: from→to를 [a, a+dur] 동안 expo-out으로, 도착 뒤 관성으로 살짝 넘쳤다 돌아온다
+export function arrive(t, a, dur, from, to, amp = .05, freq = 2.4, decay = 6) {
+  return lerp(from, to, tw(t, a, a + dur, K.expoOut)) + inertia(t, a + dur, (to - from) / dur, amp, freq, decay);
+}
 
 // ---------- 스프링 (닫힌 해, s = 시작 뒤 지난 초) ----------
 // damping/stiffness/mass. 기본은 임계 감쇠(튀지 않음). 튀는 건 진짜로 닿는 순간에만 쓴다.
