@@ -1,0 +1,26 @@
+/* base.css — reset·body·요소 기본값·한국어 줄바꿈·포커스 */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; word-break: keep-all; overflow-wrap: anywhere; line-break: strict; }
+body { font-family: var(--font); letter-spacing: var(--ls-body); color: var(--text-1); height: 100vh; overflow: hidden; background: var(--bg-desktop); -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; }
+h1, h2, h3, .hm-quote { text-wrap: balance; }
+p, .bubble, .reason { text-wrap: pretty; }
+button { font: inherit; letter-spacing: inherit; color: inherit; background: none; border: 0; cursor: pointer; touch-action: manipulation; }
+input { font: inherit; }
+select { font: inherit; }
+textarea { font: inherit; }
+svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+svg.i { flex-shrink: 0; stroke-width: 1.75; vertical-align: middle; }
+.pen { font-family: var(--font-pen); }
+.page { display: grid; height: 100vh; grid-template-columns: 1fr; }
+a { touch-action: manipulation; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+:focus:not(:focus-visible) { outline: none; }
+
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+  html { height: 100%; overscroll-behavior: none; }
+  body { height: 100%; background: var(--bg); overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .page { display: block; height: var(--vvh, 100dvh); }
+  input { font-size: 16px; -webkit-user-select: text; user-select: text; }
+  textarea { font-size: 16px; -webkit-user-select: text; user-select: text; }
+  img { -webkit-user-drag: none; }
+}

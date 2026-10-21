@@ -1,0 +1,146 @@
+/* tokens.css — 디자인 토큰, 유일한 :root (명세 §2). */
+:root {
+  color-scheme: light;
+
+  /* ---- 색: 원색 ---- */
+  --pink-50:  #fff1f3;
+  --pink-100: #ffe3e8;
+  --pink-200: #fcc5cf;
+  --pink-400: #f06d84;
+  --pink-500: #e8546b;   /* 면·아이콘 전용. 글자색 금지(흰 바탕 3.55:1) */
+  --pink-600: #cf3a5a;   /* 분홍 글자 전용(흰 4.77:1, #fff8f9 4.55:1) */
+  --pink-700: #b8324a;   /* 연분홍 면 위 글자(#fdebee 위 5.09:1) */
+  --pink-900: #5a2430;
+  --gray-0:   #ffffff;
+  --gray-50:  #f7f7f8;
+  --gray-100: #f2f2f4;
+  --gray-200: #e5e5ea;
+  --gray-300: #d1d1d6;
+  --gray-400: #a1a1a6;   /* 비활성 글자·장식만(2.57:1) */
+  --gray-500: #6e6e73;   /* 보조 글자(5.07:1) */
+  --gray-600: #3a3a3c;
+  --gray-900: #1d1d1f;
+  --gold-400: #f7c948;
+  --gold-600: #e3a21a;
+
+  /* ---- 색: 의미 ---- */
+  --bg: #fff8f9;
+  --bg-screen: radial-gradient(420px 360px at 10% 0%, #ffe3e9, transparent 70%),
+               radial-gradient(420px 380px at 100% 100%, #fde8ee, transparent 70%), #fff8f9;
+  --bg-desktop: radial-gradient(1200px 700px at 20% 10%, #f7e9ec 0%, transparent 60%),
+                radial-gradient(900px 600px at 80% 90%, #e9eef7 0%, transparent 60%), #f1f0ee;
+  --surface: var(--gray-0);
+  --surface-sunken: var(--gray-50);
+  --surface-brand: var(--pink-50);
+  --border: var(--gray-200);
+  --hairline: rgba(60, 60, 67, .12);
+  --text-1: var(--gray-900);
+  --text-2: var(--gray-500);
+  --text-3: #76767a;     /* 12px 캡션 최저선(4.5:1) */
+  --text-disabled: var(--gray-400);
+  --text-brand: var(--pink-600);
+  --text-on-brand-soft: var(--pink-700);
+  --cta: linear-gradient(180deg, #dc4563 0%, #c8325a 100%);   /* 흰 글자 중앙 약 4.6:1 */
+  --cta-pressed: linear-gradient(180deg, #c93556 0%, #b52b50 100%);
+  --cta-disabled-bg: var(--gray-100);
+  --cta-disabled-fg: var(--text-disabled);
+  --bubble-me: linear-gradient(180deg, #e2486a, #c93556);       /* 흰 15px 글자 4.5:1 이상 */
+  --bubble-them: var(--gray-100);
+  --danger: #d92d20;     /* 위험 글자·버튼 하나로 통일(흰 위 4.83:1). #ff3b30·#d6455d 폐기 */
+  --badge: #ff3b30;      /* 8px 점·숫자 배지 면만 */
+  --success: #177a48;    /* ▲ 변동, ✓ 통과 */
+  --super: #2f6fd6;      /* 슈퍼 좋아요 하나로 통일(#4a7bd8·#3d7bf2 폐기) */
+  --focus: var(--pink-600);
+
+  /* ---- 사진 위 ---- */
+  --scrim-photo: linear-gradient(180deg, rgba(0,0,0,.18) 0%, transparent 20%, transparent 45%,
+                                 rgba(24,8,14,.78) 78%, rgba(24,8,14,.88) 100%);
+  --scrim-card: linear-gradient(180deg, transparent 48%, rgba(40,10,20,.72) 100%);
+  --text-on-photo: #ffffff;
+  --text-on-photo-2: rgba(255,255,255,.82);
+  --text-shadow-photo: 0 1px 2px rgba(0,0,0,.25);
+
+  /* ---- 유리 레시피 3개 (섞어 쓰지 않는다) ---- */
+  /* A. chrome: 탭바·앱바·시트·알림·토스트·설치 안내 */
+  --glass-chrome-bg: rgba(255,255,255,.82);
+  --glass-chrome-filter: blur(16px) saturate(150%);
+  --glass-chrome-shadow: inset 0 0 0 .5px rgba(0,0,0,.06), 0 8px 24px rgba(60,20,35,.12);
+  --glass-chrome-fallback: rgba(255,255,255,.95);
+  /* B. on-photo: 인용 박스·사진 위 버튼·카드 칩·점수 알약 */
+  --glass-photo-bg: rgba(18,8,12,.28);
+  --glass-photo-filter: blur(16px) saturate(140%);
+  --glass-photo-shadow: inset 0 0 0 1px rgba(255,255,255,.18), inset 0 1px 0 rgba(255,255,255,.22);
+  --glass-photo-score: rgba(207,58,90,.72);
+  /* C. surface-card: 흰 배경 위 카드(블러 없음) */
+  --card-bg: var(--surface);
+  --card-shadow: 0 1px 2px rgba(60,20,35,.06), 0 6px 16px rgba(60,20,35,.06);
+
+  /* ---- 반경 ---- */
+  --r-xs: 8px;  --r-sm: 12px;  --r-md: 16px;  --r-lg: 22px;  --r-xl: 28px;  --r-full: 999px;
+
+  /* ---- 그림자 (색조 하나: 60,20,35) ---- */
+  --sh-1: 0 1px 2px rgba(60,20,35,.06), 0 4px 12px rgba(60,20,35,.06);
+  --sh-2: 0 8px 24px rgba(60,20,35,.12);
+  --sh-3: 0 20px 48px rgba(60,20,35,.22);
+  --sh-lift: 0 18px 40px rgba(232,84,107,.18);   /* 들린 행·끌리는 카드 */
+  --sh-cta: 0 8px 20px rgba(200,50,90,.28);
+
+  /* ---- 글꼴 ---- */
+  --font: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-pen: "Nanum Pen Script", cursive;    /* 워드마크 「오늘, 누구와?」 전용 */
+  /* 크기/줄높이/굵기/자간 — 9단계 + 배지 */
+  --fs-badge: 11px;    --lh-badge: 14px;    /* 숫자 배지·「AI」 라벨만 */
+  --fs-caption: 12px;  --lh-caption: 16px;
+  --fs-footnote: 13px; --lh-footnote: 18px;
+  --fs-body: 15px;     --lh-body: 22px;
+  --fs-callout: 16px;  --lh-callout: 22px;  /* 입력칸은 반드시 16px 이상(iOS 확대 방지) */
+  --fs-headline: 17px; --lh-headline: 24px; /* 600, push 화면(대화방·상세) 앱바 제목 */
+  --fs-title3: 20px;   --lh-title3: 26px;   /* 700 */
+  --fs-appbar: 22px;   --lh-appbar: 28px;   /* 700, 탭 루트 앱바 제목(매칭·카드·메시지·내 정보) */
+  --fs-title2: 24px;   --lh-title2: 30px;   /* 700 */
+  --fs-title1: 28px;   --lh-title1: 34px;   /* 700 */
+  --fs-display: 34px;  --lh-display: 40px;  /* 800, 점수·「1위」 */
+  --fw-regular: 400; --fw-semibold: 600; --fw-bold: 700; --fw-heavy: 800;
+  --ls-body: -0.01em; --ls-title: -0.02em; --ls-display: -0.03em;
+
+  /* ---- 간격 (4pt) ---- */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+  --gutter: 20px;        /* 글자 시작선: 앱바·온보딩·섹션 제목 */
+  --gutter-card: 16px;   /* 사진 카드·리스트 카드·로그 카드 */
+  --gutter-float: 12px;  /* 알림·시트·탭바 */
+  --touch: 44px;         /* 최소 터치 영역 */
+
+  /* ---- 셸 치수 ---- */
+  --safe-b: 34px;        /* 아래 안전 영역. 데스크톱 가상 폰은 홈 인디케이터 영역 34px, 모바일은 아래 @media가 env()로 덮음 */
+  --tab-h: 64px;
+  --tab-gap: 24px;       /* 모바일에서 아래 @media가 덮음 */
+  --appbar-h: 52px;
+  --s: 1;                /* 데스크톱 가상 폰 배율(JS가 씀), 최대 1.0 */
+
+  /* ---- z-index ---- */
+  --z-screen: 1; --z-appbar: 10; --z-tabbar: 15; --z-fade: 14; --z-overlay: 20;
+  --z-toast: 40; --z-hint: 44; --z-notice: 45; --z-sheet: 50; --z-modal: 55;
+  --z-statusbar: 60; --z-splash: 80;
+
+  /* ---- 모션: 시간 ---- */
+  --m-press: 100ms;   /* 누름 */
+  --m-fast: 160ms;    /* 상태 변화·퇴장·탭 크로스페이드 */
+  --m-base: 240ms;    /* 토스트·말풍선·칩·리스트 등장 */
+  --m-slow: 360ms;    /* push·시트 열기 */
+  --m-pop: 300ms;     /* pop·큰 시트(상세) 닫기 */
+  --m-hero: 520ms;    /* 매칭 성사·1위 공개·완료 체크 */
+  --m-count: 900ms;   /* 숫자 카운트업 */
+  --m-stagger: 40ms;  /* 리스트 간격, 최대 6개 */
+  /* ---- 모션: 곡선 ---- */
+  --e-out:   cubic-bezier(.22, 1, .36, 1);     /* 들어오기 */
+  --e-in:    cubic-bezier(.4, 0, 1, 1);        /* 나가기 */
+  --e-move:  cubic-bezier(.65, 0, .35, 1);     /* 화면 안 자리 이동(순위판) */
+  --e-nav:   cubic-bezier(.32, .72, 0, 1);     /* push/pop·시트 (iOS) */
+  --e-pop:   cubic-bezier(.34, 1.56, .64, 1);  /* 작은 요소만 튕김: 하트·체크·스위치·뗄 때 */
+  --e-fling: cubic-bezier(.2, .6, .35, 1);     /* 카드 던지기 */
+  --e-linear: linear;                          /* 진행 막대 채움 */
+
+}
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+  :root { --tab-gap: max(10px, calc(env(safe-area-inset-bottom) - 8px)); --safe-b: env(safe-area-inset-bottom, 0px); }
+}
