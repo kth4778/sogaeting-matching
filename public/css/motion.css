@@ -31,10 +31,13 @@
 
 /* 로고 「인연의 실」(ui/brand.js의 markSvg) — 선은 그려지기 전 상태에서 시작한다 */
 .mark path { fill: none; stroke: var(--gray-900); stroke-width: 1.7; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
-.mark circle { fill: var(--pink-500); }
-/* 가림막 선에서 올라오는 글자(ui/film.js의 maskHtml·rise·fall) */
-.mask { display: block; overflow: hidden; white-space: nowrap; line-height: 1.12; padding-bottom: .06em; }
-.mask-in { display: block; transform: translate3d(0, 125%, 0); will-change: transform; }
+.mark circle { fill: var(--pink-500); stroke: none; }
+/* 가림막 선에서 단어가 올라오는 글자(ui/film.js의 wordsHtml·words), 굴러가는 숫자(rollHtml·roll) */
+.words .line { display: block; white-space: nowrap; }
+.mask { display: inline-block; overflow: hidden; vertical-align: top; line-height: 1.18; padding-bottom: .06em; }
+.mask-in { display: inline-block; transform: translate3d(0, 110%, 0); will-change: transform; }
+.roll { display: inline-grid; overflow: hidden; vertical-align: top; font-variant-numeric: tabular-nums; }
+.roll > span { grid-area: 1 / 1; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
