@@ -6,16 +6,17 @@ import "./screens/cards.js";
 import "./screens/detail.js";
 import "./screens/chat.js";
 import "./screens/profile.js";
-import { $, PHOTO_V, sleep } from "./core/util.js";
+import { $, sleep } from "./core/util.js";
 import { state } from "./core/store.js";
 import { setRenderer, render as rerender, registerActions, dispatch, screens, overlays, dropRoute } from "./core/runtime.js";
 import { bootLog, renderPipeline } from "./core/log.js";
 import { signature } from "./core/engine.js";
 import { unreadTotal } from "./screens/chat.js";
 import { REDUCE, DUR, EASE } from "./ui/motion.js";
+import { markSvg } from "./ui/brand.js";
 
 const MOBILE_Q = "(max-width: 760px), (hover: none) and (pointer: coarse)";
-const SPLASH_MAX_MS = 1200, SPLASH_MIN_MS = 600, SPLASH_OUT_MS = 300;
+const SPLASH_MAX_MS = 2200, SPLASH_MIN_MS = 1500, SPLASH_OUT_MS = 300; // 로고 선이 다 그려지고 이름이 올라올 때까지(약 1.2초)
 
 // ---------- 화면 그리기 ----------
 // 규약(명세 §6.1): ① 화면 키(탭/대화 상대)가 바뀌면 이전 unmount → className 초기화 → 새로 그림 → mount → 컨테이너 페이드
@@ -158,7 +159,7 @@ async function showSplash() {
 
   const splash = document.createElement("div");
   splash.className = "splash";
-  splash.innerHTML = `<img src="logo.png?v=${PHOTO_V}" alt=""><h1>오늘, 누구와?</h1>`;
+  splash.innerHTML = `${markSvg()}<h1 class="mask"><span class="mask-in">오늘, 누구와?</span></h1>`;
   $(".phone-screen").append(splash);
   const t0 = performance.now();
   let done = false;

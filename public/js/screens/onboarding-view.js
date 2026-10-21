@@ -1,6 +1,7 @@
 import { SAMPLE_PROFILES } from "../data/profiles.js";
 import { esc, meSrc } from "../core/util.js";
 import { icon } from "../ui/icons.js";
+import { heroHtml } from "../ui/brand.js";
 
 // 처음 시작할 때 한 화면에 질문 하나씩 묻는 가입 흐름.
 // 여기서 모은 칸이 그대로 매칭 로직의 입력(내 프로필 + 이상형 조건)이 된다.
@@ -178,30 +179,14 @@ function bodyHtml(step, d, ob) {
   return "";
 }
 
-// 웰컴 히어로(모션 그래픽). 다른 팀이 새로 만들고 있어 지금 모양 그대로 둔다 — 이 함수만 갈아 끼우면 된다
+// 웰컴 히어로(모션 그래픽은 ui/brand.js) + 서비스 소개 3장
 export function welcomeHeroHtml() {
-  const ring = (ids, cls) => `<div class="orbit ${cls}">${ids.map((id, i) => `
-      <span class="orb" style="--a:${(360 / ids.length) * i}deg"><i style="background-image:url(photos/thumb/${id}.jpg)"></i></span>`).join("")}</div>`;
   const STORY = [
     ["intro-1.jpg", "조건부터 서로 맞춰 봐요", "나이·흡연·종교, 서로의 조건이 맞는 사람만 남겨요"],
     ["intro-2.jpg", "취향이 닮은 사람을 찾아요", "등산과 산 타기처럼 말이 달라도 같은 취향을 알아봐요"],
     ["intro-3.jpg", "왜 잘 맞는지 알려드려요", "점수만이 아니라 이유와 첫 만남 제안까지"],
   ];
-  return `
-        <div class="hero">
-          ${ring(["p01", "p13", "p07", "p16", "p05", "p12"], "orbit-in")}
-          ${ring(["p02", "p11", "p09", "p20", "p06", "p17", "p08", "p19"], "orbit-out")}
-          <div class="hero-core">
-            <img src="logo.png?v=4" alt="">
-            <span class="hero-heart">♥</span>
-          </div>
-          <div class="hero-pair">
-            <i style="background-image:url(photos/thumb/me-f.jpg)"></i>
-            <svg viewBox="0 0 120 30"><path d="M4 15 C 40 -5, 80 35, 116 15" /></svg>
-            <i style="background-image:url(photos/thumb/me-m.jpg)"></i>
-          </div>
-          <span class="pen hero-title">오늘, 누구와?</span>
-        </div>
+  return `${heroHtml()}
         <div class="story">
           <div class="story-track">${STORY.map(([img, title, desc]) => `
             <div class="story-card"><img src="${img}" alt=""><div><b>${title}</b><p>${desc}</p></div></div>`).join("")}
