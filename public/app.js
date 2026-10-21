@@ -601,18 +601,21 @@ function homeHtml() {
   const [first, ...rest] = r.ranked;
   const p = byId(first.id);
   const headline = r.explain?.headline ?? first.oneLine;
-  const confetti = ["#f7b500 12% 18% -20", "#4a7bd8 80% 14% 25", "#e8546b 22% 64% 35", "#2bbf74 76% 60% -30", "#8b5cf6 8% 40% 15", "#f7b500 90% 40% -15"]
-    .map(c => { const [color, x, y, rot] = c.split(" "); return `<i style="background:${color};left:${x};top:${y};transform:rotate(${rot}deg)"></i>`; }).join("");
   return `
     <div class="appbar"><span>오늘의 매칭</span><span class="muted">1 / ${r.ranked.length}</span></div>
-    <div class="rank1"><div class="confetti">${confetti}</div><div class="crown">👑</div><h2>1위</h2><p>가장 잘 맞는 상대예요!</p></div>
-    <div class="top-photo photo" style="background-image:url(${photo(p)})" data-act="detail:${p.id}"></div>
-    <div class="top-meta"><h3>${esc(p.name)} <span>${p.age}</span></h3><span class="score">♥ ${first.llmScore}점</span></div>
-    <div class="top-sub">📍 ${p.region} · ${esc(p.job)}</div>
-    <div class="quote">${esc(headline)}</div>
-    <div class="pad two-btn">
-      <button class="btn" data-act="talk:${p.id}">💬 대화하기</button>
-      <button class="btn line" data-act="detail:${p.id}">자세히 보기</button>
+    <div class="hero-match">
+      <div class="hm-photo photo" style="background-image:url(${photo(p)})" data-act="detail:${p.id}"></div>
+      <div class="hm-petals"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="hm-badge"><span>👑</span><b>1위</b><small>가장 잘 맞는 상대예요</small></div>
+      <div class="hm-info">
+        <div class="hm-name"><h3>${esc(p.name)} <span>${p.age}</span></h3><span class="hm-score">♥ ${first.llmScore}점</span></div>
+        <p class="hm-sub">📍 ${p.region} · ${esc(p.job)}</p>
+        <div class="hm-quote">“ ${esc(headline)}</div>
+        <div class="two-btn">
+          <button class="btn" data-act="talk:${p.id}">💬 대화하기</button>
+          <button class="btn glass-btn" data-act="detail:${p.id}">자세히 보기</button>
+        </div>
+      </div>
     </div>
     <div class="rank-list">
       ${rest.map((c, i) => {
