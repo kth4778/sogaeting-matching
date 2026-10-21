@@ -2,7 +2,7 @@
 // Ollama 없이 돌도록 임베딩 함수를 가짜로 바꿔 넣는다
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cosine, profileText, embedRank } from "../local-llm/embed-rank.js";
+import { cosine, profileText, embedRank, pca3 } from "../local-llm/embed-rank.js";
 
 test("cosine: 같은 방향 1, 직각 0", () => {
   assert.equal(cosine([1, 0], [2, 0]), 1);
@@ -31,6 +31,40 @@ test("embedRank: 나와 가까운 사람이 먼저, 같은 문장은 다시 계�
   calls.length = 0;
   await embedRank({ me, people }, fakeEmbed);
   assert.equal(calls.length, 0);
+});
+
+// ---------- 화면용 벡터 값: 앞 16차원 + 3차원 PCA 좌표 ----------
+test("pca3: 퍼짐이 큰 축이 첫째 성분, 퍼짐 비율 합은 1 이하", () => {
+  const { coords, variance } = pca3([[0, 0, 0], [2, 0, 0], [-2, 0, 0], [0, 1, 0], [0, -1, 0]]);
+  assert.equal(coords.length, 5);
+  assert.ok(Math.abs(Math.abs(coords[1][0]) - 2) < 1e-6);
+  assert.ok(Math.abs(coords[1][1]) < 1e-6);
+  assert.ok(Math.abs(Math.abs(coords[3][1]) - 1) < 1e-6);
+  assert.ok(coords.every(c => Math.abs(c[2]) < 1e-6));
+  assert.ok(Math.abs(variance[0] - 0.8) < 1e-6 && Math.abs(variance[1] - 0.2) < 1e-6 && variance[2] < 1e-6);
+});
+
+test("embedRank: 나와 각 사람에게 앞 16차원과 3차원 좌표를 같이 주고, 같은 묶음이면 다시 계산하지 않는다", async () => {
+  const base = { "벡터나": 0, "벡터가": 1, "벡터라": 2, "벡터다": 3 };
+  const vecOf = key => Array.from({ length: 20 }, (_, j) => (j === base[key] ? 1 : 0) + j / 100);
+  const fakeEmbed = async texts => texts.map(t => vecOf(t.split("\n")[1].slice(4)));
+  const p = (id, intro) => ({ id, interests: ["x"], intro, personality: "y" });
+  const input = { me: p("me", "벡터나"), people: [p("a", "벡터가"), p("b", "벡터라"), p("c", "벡터다")] };
+
+  const res = await embedRank(input, fakeEmbed);
+  assert.equal(res.me.dims.length, 16);
+  assert.deepEqual(res.me.dims, vecOf("벡터나").slice(0, 16));
+  assert.equal(res.dim, 20);
+  assert.equal(res.me.xyz.length, 3);
+  for (const s of res.scores) {
+    assert.equal(s.dims.length, 16);
+    assert.equal(s.xyz.length, 3);
+    assert.ok(s.xyz.every(Number.isFinite));
+  }
+  assert.equal(res.pcaVariance.length, 3);
+
+  const again = await embedRank(input, fakeEmbed);
+  assert.equal(again.me.xyz, res.me.xyz); // 같은 배열 = 캐시에서 꺼냄
 });
 
 // ---------- LLM 연결 갈아끼우기 ----------
