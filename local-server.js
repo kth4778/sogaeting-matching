@@ -12,7 +12,7 @@ import { ollamaRunner } from "./local-llm/ollama.js";
 // 재순위·이유·채팅을 누가 할지: claude(기본) 또는 ollama(.env에 LLM_PROVIDER=ollama)
 const PROVIDER = process.env.LLM_PROVIDER === "ollama" ? "ollama" : "claude";
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "public");
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".svg": "image/svg+xml" };
 
