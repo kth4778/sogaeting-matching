@@ -1,5 +1,5 @@
 // 매칭 과정 무대 (매칭 탭 진행 화면). 정해진 영상이 아니라 이번 실행의 실제 값만 그린다:
-//   1단계 ruleFilter 결과 · 2단계 /api/embed 응답(코사인, 앞 16차원, 3차원 PCA 좌표) · 3단계 /api/rerank 응답 · 4단계 /api/explain 응답
+//   1단계 ruleFilter 결과 · 2단계 /api/embed 응답(코사인) · 3단계 /api/rerank 응답 · 4단계 /api/explain 응답
 // 기다리는 동안은 0.5초마다 무언가 움직이고, 시계는 실제 요청을 보낸 때부터 잰다. 응답이 오면 그 값으로 바뀐다.
 // 움직임은 닫힌 해 감쇠 스프링(질량 1). 동작 줄이기 설정이면 바로 제자리로 간다.
 // (매칭 로그와 같이 기술 용어 예외 파일: tools/check-terms.mjs)
@@ -10,7 +10,6 @@ export const MIN_STAGE_MS = 1200; // 단계 그림의 최소 길이. 실제 응�
 const BEAT = 500;                 // 기다리는 동안 무언가 바뀌는 간격
 const RULE_BEAT = 260;            // 규칙 하나가 적용되는 간격 (계산은 이미 끝나 있어 짧게)
 const H = 420;                    // 무대 높이
-const CANVAS_H = 268;
 const D0 = 64;                    // 원판 기본 지름. 줄여서만 쓴다(키우면 사진이 흐려진다)
 const HERO = 120;
 const CARD_TOP = 40, CARD_STEP = 64, AV_X = 58;
@@ -18,8 +17,6 @@ const CHIP_Y = 372;
 const SPR = { move: { k: 170, c: 22 }, pop: { k: 300, c: 20 }, soft: { k: 110, c: 19 } };
 const RULES = ["성별", "나이", "흡연", "종교"];
 
-// 임베딩에 넣은 글과 같은 모양 (local-llm/embed-rank.js의 profileText)
-const textOf = p => `관심사: ${p.interests.join(", ")}\n소개: ${p.intro}\n성격: ${p.personality}`;
 const secs = ms => (ms / 1000).toFixed(ms < 1000 ? 2 : 1); // 1초 안쪽은 0.0초로 보이지 않게
 const until = async t => { const left = t - performance.now(); if (left > 0) await sleep(left); };
 
@@ -84,17 +81,6 @@ class Num {
   apply(now) { this.el.textContent = this.fmt(this.val.at(now)); return this.val.rest; }
 }
 
-// 막대 하나 (0선 위아래로 자란다)
-class Bar {
-  constructor(el, mid, amp) { this.el = el; this.mid = mid; this.amp = amp; this.val = new Val(0); items.add(this); }
-  apply(now) {
-    const h = this.val.at(now) * this.amp;
-    this.el.style.height = `${Math.abs(h).toFixed(1)}px`;
-    this.el.style.top = `${(h >= 0 ? this.mid - h : this.mid).toFixed(1)}px`;
-    return this.val.rest;
-  }
-}
-
 // ---------- 프레임 루프 (움직이는 것이 있을 때만 돈다) ----------
 const items = new Set();
 const hooks = new Set();
@@ -130,6 +116,8 @@ function measure() {
   const w = q(".st-body")?.clientWidth;
   if (w) W = w;
 }
+// 단계마다 무대 높이를 내용에 맞춘다 (빈 칸이 남지 않게)
+function setHeight(h) { const b = q(".st-body"); if (b) b.style.height = `${h}px`; }
 function msg(text) {
   const el = q(".st-msg");
   if (!el || el.textContent === text) return;
@@ -214,59 +202,51 @@ export async function stageRules({ passed, excluded }) {
 }
 
 // ---------- 2단계: 임베딩 ----------
+// 한 사람 = 한 줄. 사진 · 이름 · 나와 비슷한 정도 막대 · 실제 코사인 값. 응답이 오면 막대가 실제 값까지 자라고 순서대로 다시 선다
+const ROW_TOP = 64, ROW_H = 38, ROW_MAX = 8, PH_X = 30, PH = 28;
+const rowY = i => ROW_TOP + i * ROW_H + ROW_H / 2;
+
 // embP는 { ok, value: embeddingRank 결과, ms } 로 끝나는 약속
 export async function stageEmbed(embP, startedAt, passed) {
   measure();
   const t0 = performance.now();
-  const me = S.me;
-  const order = [me, ...passed];
   const passedIds = new Set(passed.map(p => p.id));
+  const shown = passed.slice(0, ROW_MAX);
 
   // 빠진 사람은 아래로 떨어지며 사라지고, 칸도 접힌다
   S.people.filter(p => !passedIds.has(p.id)).forEach((p, i) => {
     const d = S.discs.get(p.id);
     d.to({ y: d.v.y.to + 40, o: 0, s: 10 / D0 }, SPR.soft, i * 12);
   });
-  S.bins.to({ o: 0, y: 320 }, SPR.soft);
+  S.bins.to({ o: 0, y: 320 }, SPR.pop);
+  setHeight(ROW_TOP + shown.length * ROW_H + 40);
 
-  // 한 줄로: 나 + 통과한 사람
-  const pitch = Math.min(34, (W - 64) / Math.max(1, passed.length));
-  const size = Math.min(28, pitch - 3);
-  S.meDisc.to({ x: 24, y: 22, s: 34 / D0 }, SPR.move);
-  passed.forEach((p, i) => S.discs.get(p.id).to({ x: 56 + pitch * (i + 0.5), y: 22, s: size / D0, o: 1 }, SPR.move, i * 18));
-  S.rowPos = new Map(passed.map((p, i) => [p.id, 56 + pitch * (i + 0.5)]));
-  S.rowSize = size;
+  // 맨 위: 나와 내 글. 이 글과 각 사람의 글을 숫자로 바꿔 비교한다
+  S.meDisc.to({ x: PH_X, y: 30, s: 36 / D0 }, SPR.move);
+  const head = mk("st-mine", `<b>내 관심사·소개 글</b><p>${esc(S.me.interests.join(", "))}</p>`);
+  S.body.append(head);
+  S.mine = new Node(head, { y: 12, o: 0 }).to({ y: 10, o: 1 }, SPR.soft, 120);
 
-  // 글 → 숫자 막대
-  const vec = mk("st-vec", `
-    <div class="st-text"><small>임베딩에 넣는 글</small><p></p></div>
-    <div class="st-bars"><small>벡터 · 앞 16칸</small><div class="st-barbox">${Array.from({ length: 16 }, (_, n) => `<span style="--n:${n}"><i></i><u></u></span>`).join("")}</div><span class="st-barcap">숫자로 바꾸는 중</span></div>`);
-  S.body.append(vec);
-  S.vec = new Node(vec, { y: 66, o: 0 }).to({ y: 50, o: 1 }, SPR.soft, 120);
-  const BOX_H = 64;
-  const mine = [...vec.querySelectorAll(".st-barbox i")].map(el => new Bar(el, BOX_H / 2, BOX_H / 2 - 2));
-  const theirs = [...vec.querySelectorAll(".st-barbox u")].map(el => new Bar(el, BOX_H / 2, BOX_H / 2 - 2));
-  vec.querySelector(".st-barbox").classList.add("wait");
+  // 사람마다 한 줄. 사진(원판)은 줄 왼쪽에 앉는다
+  const list = mk("st-list", `<div class="st-axis"><span>덜 비슷</span><span>비슷</span></div>`);
+  S.body.append(list);
+  S.list = new Node(list, { o: 0 }).to({ o: 1 }, SPR.soft, 160);
+  const rows = new Map();
+  shown.forEach((p, i) => {
+    const el = mk("st-row", `<b>${esc(p.name)}</b><span class="st-track wait"><i></i></span><em>–</em>`);
+    list.append(el);
+    rows.set(p.id, { el, node: new Node(el, { y: rowY(i) - ROW_H / 2, o: 0 }).to({ o: 1 }, SPR.soft, 250 + i * 30) });
+    S.discs.get(p.id).to({ x: PH_X, y: rowY(i), s: PH / D0, o: 1 }, SPR.move, 150 + i * 30);
+  });
+  passed.slice(ROW_MAX).forEach(p => S.discs.get(p.id).to({ o: 0 }, SPR.soft));
+  const foot = mk("st-foot", passed.length > ROW_MAX ? `외 ${passed.length - ROW_MAX}명도 같이 비교해요` : "");
+  S.body.append(foot);
+  S.foot = new Node(foot, { y: ROW_TOP + shown.length * ROW_H + 10, o: 1 });
 
-  // 3차원 공간
-  const wrap = mk("st-space");
-  const canvas = document.createElement("canvas");
-  wrap.append(canvas);
-  S.body.append(wrap);
-  S.space = new Node(wrap, { y: 160, o: 0, s: 0.96 }).to({ y: 146, o: 1, s: 1 }, SPR.soft, 200);
-  const sp = makeSpace(canvas, me);
-  hooks.add(sp.draw);
-
-  const textEl = vec.querySelector(".st-text p");
   const stopClock = startClock(startedAt);
   const stopBeat = every(BEAT, n => {
-    const p = order[n % order.length];
-    textEl.textContent = textOf(p);
-    const d = p === me ? S.meDisc : S.discs.get(p.id);
-    const base = p === me ? 34 : size;
-    d.to({ s: (base * 1.3) / D0 }, SPR.pop);
-    setTimeout(() => d.to({ s: base / D0 }, SPR.move), REDUCE ? 0 : 200);
-    msg(`${order.length}명의 글을 한 번에 보냈어요 · 벡터를 기다리는 중`);
+    rows.forEach(({ el }, id) => el.classList.toggle("look", id === shown[n % shown.length].id));
+    msg("글을 숫자로 바꿔 나와 얼마나 비슷한지 재는 중");
   });
 
   const r = await embP;
@@ -274,203 +254,38 @@ export async function stageEmbed(embP, startedAt, passed) {
   stopClock(r.ms);
   const emb = r.value;
   const top = emb.ranked.slice(0, 5);
-  // 막대 높이 기준: 화면에 나오는 값 중 가장 큰 절댓값
-  const amp = emb.fallback ? 1 : Math.max(...[emb.me.dims, ...top.map(c => c.dims)].flat().map(Math.abs)) || 1;
-  S.meDisc.to({ s: 34 / D0 }, SPR.move);
-  passed.forEach(p => S.discs.get(p.id).to({ s: size / D0 }, SPR.move));
+  const rank = new Map(emb.ranked.map((c, i) => [c.profile.id, { c, i }]));
 
-  if (emb.fallback) {
-    // 실패를 숨기지 않는다: 벡터 없이 뜻 묶음 점수로 줄 세운 값을 그대로 보여 준다
-    msg("로컬 임베딩 서버(Ollama)에 연결하지 못해 관심사 뜻 묶음 점수로 대신해요");
-    vec.querySelector(".st-barbox").classList.replace("wait", "none");
-    vec.querySelector(".st-barcap").textContent = "벡터를 받지 못했어요";
-    textEl.textContent = emb.fallback;
-    sp.setFallback(emb.ranked);
-  } else {
-    msg(`${emb.model} · ${emb.dim}차원 벡터를 ${secs(r.ms)}초 만에 받았어요`);
-    const meVals = emb.me.dims;
-    vec.querySelector(".st-barbox").classList.remove("wait");
-    textEl.textContent = textOf(me);
-    mine.forEach((b, i) => b.val.set(meVals[i] / amp, SPR.pop, i * 22));
-    vec.querySelector(".st-barcap").textContent = `나: ${meVals.slice(0, 3).map(v => v.toFixed(4)).join(", ")} …`;
-    sp.setPca(emb);
-  }
-  await sleep(REDUCE ? 0 : 600);
+  // 막대가 실제 값까지 자란다 (가로 끝 = 1.0, 완전히 같은 글)
+  rows.forEach(({ el }, id) => {
+    const { c } = rank.get(id);
+    el.classList.remove("look");
+    el.querySelector(".st-track").classList.remove("wait");
+    el.querySelector(".st-track i").style.width = `${(Math.max(0, c.embed) * 100).toFixed(1)}%`;
+    new Num(el.querySelector("em"), 0, v => v.toFixed(3)).val.set(c.embed, SPR.soft);
+  });
+  foot.textContent = emb.fallback
+    ? "임베딩 서버에 연결하지 못해 관심사 뜻 묶음 점수로 대신 계산했어요"
+    : `${emb.model} 임베딩 · ${secs(r.ms)}초 · 1에 가까울수록 비슷해요`;
+  foot.classList.toggle("fail", !!emb.fallback);
+  msg(emb.fallback ? "관심사 뜻 묶음 점수로 비교했어요" : "비슷한 순서로 다시 줄 세워요");
+  await sleep(REDUCE ? 0 : 700);
 
-  // 상위 5명을 한 명씩 짚는다 (값은 응답 그대로)
-  for (const [i, c] of top.entries()) {
-    const d = S.discs.get(c.profile.id);
-    d.el.dataset.rank = i + 1;
-    d.el.classList.add("top");
-    d.to({ y: 22, s: (size * 1.25) / D0 }, SPR.pop);
-    sp.highlight(c.profile.id);
-    textEl.textContent = textOf(c.profile);
-    if (!emb.fallback) {
-      theirs.forEach((b, j) => b.val.set(c.dims[j] / amp, SPR.pop, j * 12));
-      vec.querySelector(".st-barcap").textContent = `${c.profile.name}: ${c.dims.slice(0, 3).map(v => v.toFixed(4)).join(", ")} …`;
-      msg(`${i + 1}위 ${c.profile.name} · 코사인 유사도 ${c.embed.toFixed(3)}`);
-    } else {
-      msg(`${i + 1}위 ${c.profile.name} · 뜻 묶음 점수 ${c.embed.toFixed(3)}`);
-    }
-    await sleep(REDUCE ? 0 : 380);
-  }
-  const topIds = new Set(top.map(c => c.profile.id));
-  passed.filter(p => !topIds.has(p.id)).forEach(p => S.discs.get(p.id).to({ o: 0.25 }, SPR.soft));
-  sp.highlight(null);
-  msg(`${emb.fallback ? "뜻 묶음 점수" : "코사인 유사도"} 상위 ${top.length}명이 다음 단계로 가요`);
+  // 비슷한 순서로 다시 선다. 상위 5명만 색이 남는다
+  const order = shown.map(p => rank.get(p.id)).sort((a, b) => a.i - b.i);
+  order.forEach(({ c }, i) => {
+    const row = rows.get(c.profile.id);
+    const isTop = top.includes(c);
+    row.node.to({ y: rowY(i) - ROW_H / 2, o: isTop ? 1 : 0.45 }, SPR.move, i * 40);
+    row.el.classList.toggle("top", isTop);
+    row.el.querySelector("b").innerHTML = `${isTop ? `<span class="st-n">${top.indexOf(c) + 1}</span>` : ""}${esc(c.profile.name)}`;
+    S.discs.get(c.profile.id).to({ y: rowY(i), o: isTop ? 1 : 0.45 }, SPR.move, i * 40);
+  });
+  msg(`가장 비슷한 ${top.length}명이 다음 단계로 가요`);
   S.top = top;
   S.fallback = !!emb.fallback;
+  await sleep(REDUCE ? 0 : 900);
   await until(t0 + MIN_STAGE_MS);
-}
-
-// 캔버스 2D 원근 투영. 카메라가 천천히 돈다
-function makeSpace(canvas, me) {
-  const dpr = Math.min(2, devicePixelRatio || 1);
-  const cw = W, ch = CANVAS_H;
-  canvas.width = cw * dpr; canvas.height = ch * dpr;
-  canvas.style.width = `${cw}px`; canvas.style.height = `${ch}px`;
-  const ctx = canvas.getContext("2d");
-  const imgs = new Map();
-  const img = src => {
-    if (!src) return null;
-    if (!imgs.has(src)) { const im = new Image(); im.src = src; imgs.set(src, im); }
-    return imgs.get(src);
-  };
-  const st = { mode: "wait", pts: [], hi: null, yaw: 0.6, last: 0, variance: null, dim: 0 };
-
-  function proj([x, y, z], cx, cy, sc) {
-    const cY = Math.cos(st.yaw), sY = Math.sin(st.yaw), P = 0.42, cP = Math.cos(P), sP = Math.sin(P);
-    const x1 = x * cY + z * sY, z1 = -x * sY + z * cY;
-    const y2 = y * cP - z1 * sP, z2 = y * sP + z1 * cP;
-    const f = 3.2 / (3.2 + z2);
-    return { X: cx + x1 * sc * f, Y: cy - y2 * sc * f, z: z2, f };
-  }
-  function photoDot(im, x, y, r, ring, letter) {
-    ctx.save();
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.closePath();
-    ctx.fillStyle = "#ffe3e8"; ctx.fill();
-    if (im?.complete && im.naturalWidth) {
-      ctx.clip();
-      const s = Math.min(im.naturalWidth, im.naturalHeight);
-      ctx.drawImage(im, (im.naturalWidth - s) / 2, (im.naturalHeight - s) * 0.3, s, s, x - r, y - r, r * 2, r * 2);
-    } else if (letter) {
-      ctx.fillStyle = "#cf3a5a"; ctx.font = `700 ${Math.round(r)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(letter, x, y);
-    }
-    ctx.restore();
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.lineWidth = ring ? 2.5 : 1.5; ctx.strokeStyle = ring ?? "#ffffff"; ctx.stroke();
-  }
-
-  function draw(now) {
-    if (!canvas.isConnected || document.hidden) { st.last = 0; return false; }
-    const dt = st.last ? Math.min(50, now - st.last) : 16;
-    st.last = now;
-    if (!REDUCE) st.yaw += dt * 0.00032;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, cw, ch);
-    const cx = cw / 2, cy = ch / 2 + 4, sc = Math.min(cw, ch) * 0.37;
-    let moving = false;
-
-    if (st.mode === "fallback") return drawFallback(now);
-
-    // 축 3개
-    ctx.lineWidth = 1;
-    ["PC1", "PC2", "PC3"].forEach((label, a) => {
-      const e = [0, 0, 0]; e[a] = 1;
-      const n = [0, 0, 0]; n[a] = -1;
-      const A = proj(n, cx, cy, sc), B = proj(e, cx, cy, sc);
-      ctx.strokeStyle = "rgba(29,29,31,.14)"; ctx.beginPath(); ctx.moveTo(A.X, A.Y); ctx.lineTo(B.X, B.Y); ctx.stroke();
-      ctx.fillStyle = "rgba(29,29,31,.38)"; ctx.font = "600 9px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(st.variance ? `${label} ${(st.variance[a] * 100).toFixed(0)}%` : label, B.X, B.Y - 4);
-    });
-
-    if (st.mode === "wait") {
-      // 레이더처럼 도는 훑기 (응답을 기다리는 중)
-      const a = now * 0.0035;
-      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, sc * 1.05);
-      g.addColorStop(0, "rgba(224,67,94,.22)"); g.addColorStop(1, "rgba(224,67,94,0)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, sc * 1.05, a, a + 0.7); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "rgba(29,29,31,.45)"; ctx.font = "600 11px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("벡터를 기다리는 중", cx, ch - 10);
-      return !REDUCE;
-    }
-
-    // 점: 원점에서 화살표로, 먼 것부터 그린다
-    const pts = st.pts.map(p => {
-      const g = p.grow.at(now);
-      if (!p.grow.rest) moving = true;
-      return { p, g, ...proj(p.xyz.map(v => v * g), cx, cy, sc) };
-    }).sort((a, b) => b.z - a.z);
-    const O = proj([0, 0, 0], cx, cy, sc);
-    for (const { p, g, X, Y, f } of pts) {
-      if (g <= 0.01) continue;
-      const focus = st.hi === p.id;
-      const color = p.me ? "#e0435e" : p.rank ? "rgba(29,29,31,.62)" : "rgba(29,29,31,.22)";
-      ctx.strokeStyle = focus ? "#e0435e" : color; ctx.lineWidth = p.me || focus ? 2.2 : 1.2;
-      ctx.beginPath(); ctx.moveTo(O.X, O.Y); ctx.lineTo(X, Y); ctx.stroke();
-      const r = (p.me ? 13 : p.rank ? 12 : 9) * f * (focus ? 1.25 : 1);
-      photoDot(img(p.src), X, Y, r, p.me || focus ? "#e0435e" : p.rank ? "#1d1d1f" : null, p.letter);
-      ctx.font = `${p.me || p.rank ? 700 : 500} 10px sans-serif`; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-      ctx.fillStyle = p.me ? "#cf3a5a" : focus ? "#cf3a5a" : p.rank ? "#1d1d1f" : "rgba(29,29,31,.5)";
-      ctx.fillText(p.me ? "나" : `${p.rank ? `${p.rank}위 ` : ""}${p.cos.toFixed(3)}`, X + r + 3, Y);
-    }
-    ctx.textBaseline = "alphabetic";
-    ctx.fillStyle = "rgba(29,29,31,.45)"; ctx.font = "500 10px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText(`${st.dim}차원을 3차원으로 줄인 그림 · 숫자는 실제 코사인 값`, cx, ch - 8);
-    return !REDUCE || moving;
-  }
-
-  function drawFallback(now) {
-    const list = st.pts;
-    const rowH = Math.min(24, (ch - 40) / Math.max(1, list.length));
-    const max = Math.max(...list.map(p => p.cos)) || 1;
-    let moving = false;
-    ctx.fillStyle = "#d92d20"; ctx.font = "600 11px sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-    ctx.fillText("임베딩 서버 연결 실패 · 관심사 뜻 묶음 점수로 대신 계산", 12, 12);
-    list.forEach((p, i) => {
-      const g = p.grow.at(now);
-      if (!p.grow.rest) moving = true;
-      const y = 28 + i * rowH + rowH / 2;
-      photoDot(img(p.src), 22, y, Math.min(9, rowH / 2 - 1), p.rank ? "#e0435e" : null);
-      const w = (cw - 110) * (p.cos / max) * g;
-      ctx.fillStyle = p.rank ? "#e0435e" : "rgba(29,29,31,.2)";
-      ctx.fillRect(40, y - 4, w, 8);
-      ctx.fillStyle = "#1d1d1f"; ctx.font = "600 10px sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-      ctx.fillText(p.cos.toFixed(3), 46 + w, y);
-    });
-    ctx.textBaseline = "alphabetic";
-    return moving;
-  }
-
-  return {
-    draw,
-    setPca(emb) {
-      const raw = [{ me: true, id: "me", xyz: emb.me.xyz, src: meSrc(me), letter: me.name.slice(0, 1), cos: 1 },
-        ...emb.ranked.map((c, i) => ({ id: c.profile.id, xyz: c.xyz, src: photo(c.profile), cos: c.embed, rank: i < 5 ? i + 1 : 0 }))];
-      const R = Math.max(...raw.map(p => Math.hypot(...p.xyz))) || 1;
-      st.pts = raw.map((p, i) => {
-        const grow = new Val(0);
-        grow.set(1, SPR.soft, i * 50);
-        return { ...p, xyz: p.xyz.map(v => v / R), grow };
-      });
-      st.variance = emb.pcaVariance;
-      st.dim = emb.dim;
-      st.mode = "pca";
-      hooks.add(draw);
-      wake();
-    },
-    setFallback(ranked) {
-      st.pts = ranked.map((c, i) => {
-        const grow = new Val(0);
-        grow.set(1, SPR.soft, i * 40);
-        return { id: c.profile.id, src: photo(c.profile), cos: c.embed, rank: i < 5 ? i + 1 : 0, grow };
-      });
-      st.mode = "fallback";
-      wake();
-    },
-    highlight(id) { st.hi = id; wake(); },
-  };
 }
 
 // ---------- 3단계: LLM 재순위 ----------
@@ -479,9 +294,8 @@ export async function stageRerank(rrP, startedAt) {
   measure();
   const t0 = performance.now();
   const top = S.top;
-  S.space.to({ o: 0, s: 0.92, y: 170 }, SPR.soft);
-  S.vec.to({ o: 0, y: 30 }, SPR.soft);
-  setTimeout(() => hooks.clear(), REDUCE ? 0 : 500);
+  [S.list, S.mine, S.foot].forEach(n => n.to({ o: 0 }, SPR.soft));
+  setHeight(CARD_TOP + top.length * CARD_STEP + 8);
   const topIds = new Set(top.map(c => c.profile.id));
   S.people.filter(p => !topIds.has(p.id)).forEach(p => S.discs.get(p.id).to({ o: 0 }, SPR.soft));
   S.meDisc.to({ o: 0, s: 20 / D0 }, SPR.soft);
@@ -556,6 +370,7 @@ export async function stageExplain(exPs, startedAt) {
   const final = S.final;
   const win = final[0].profile;
   S.head.to({ o: 0, y: -8 }, SPR.soft);
+  setHeight(H);
 
   // 1위 사진이 가운데 위로 커지고, 나머지 카드는 아래 칩으로 접힌다
   const hero = document.createElement("span");
@@ -564,7 +379,7 @@ export async function stageExplain(exPs, startedAt) {
   S.body.append(hero);
   const heroNode = new Node(hero, { x: AV_X, y: CARD_TOP + 28, s: 40 / HERO, o: 1 }).to({ x: W / 2, y: 62, s: 100 / HERO }, SPR.move, 60);
   const chips = mk("st-chips", final.map((c, i) => `
-    <span class="st-chip ${i === 0 ? "win" : ""}" style="left:${(W * (i + 0.5)) / final.length}px">
+    <span class="st-chip ${i === 0 ? "st-win" : ""}" style="left:${(W * (i + 0.5)) / final.length}px">
       <i style="background-image:url(${photo(c.profile)})"></i><small><span class="spin"></span></small></span>`).join(""));
   S.body.append(chips);
   final.forEach((c, i) => {
