@@ -1,0 +1,75 @@
+/* cards.css — 카드 탭(덱·반응 버튼·빈 덱) (WP3) */
+
+/* ---- 반응 버튼 (상세 하단도 같이 쓴다) ---- */
+.deck-actions { display: flex; justify-content: center; align-items: flex-end; gap: var(--sp-4); margin: var(--sp-3) 0 var(--sp-2); }
+.act { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: var(--touch); touch-action: manipulation; color: var(--text-2); }
+.act small { font: var(--fw-semibold) var(--fs-caption)/var(--lh-caption) var(--font); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.circle { width: 56px; height: 56px; border-radius: var(--r-full); display: grid; place-items: center;
+  background: var(--glass-chrome-bg); -webkit-backdrop-filter: var(--glass-chrome-filter); backdrop-filter: var(--glass-chrome-filter);
+  box-shadow: var(--glass-chrome-shadow);
+  transition: transform var(--m-base) var(--e-pop); }
+.act:active .circle { transform: scale(.88); transition-duration: var(--m-press); transition-timing-function: var(--e-out); }
+.circle.pass { color: var(--gray-500); }
+.circle.like { width: 68px; height: 68px; color: var(--text-on-photo); background: var(--cta); box-shadow: var(--sh-cta), inset 0 1px 0 rgba(255,255,255,.35); }
+.circle.super { color: var(--super); }
+.act-undo { align-self: center; margin-bottom: 22px; }
+.act-undo .circle { width: var(--touch); height: var(--touch); color: var(--gray-600); }
+.act-undo[aria-disabled="true"] { opacity: .35; }
+.act.is-empty { opacity: .4; }
+.act:focus-visible { outline: none; }
+.act:focus-visible .circle { box-shadow: 0 0 0 3px var(--focus); }
+.cards-count { font-variant-numeric: tabular-nums; }
+
+/* ---- 덱 ---- */
+.cards-page { display: flex; flex-direction: column; height: 100%; }
+.deck { position: relative; flex: 1; min-height: 0; max-height: 560px; height: 500px; margin: var(--sp-1) var(--gutter-card) 0; }
+.card { position: absolute; inset: 0; overflow: hidden; border-radius: var(--r-xl); box-shadow: var(--sh-2); user-select: none; -webkit-user-select: none;
+  transition: transform var(--m-base) var(--e-out); --p: 0; }
+.deck .card:last-child { touch-action: none; cursor: grab; }
+.card.dragging { transition: none; cursor: grabbing; }
+.card .photo { position: absolute; inset: 0; background-size: cover; background-position: center; }
+.card-tint { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(232,84,107,calc(.28 * var(--p))), transparent 60%); }
+.card .shade { position: absolute; inset: auto 0 0 0; padding: 96px var(--sp-5) var(--sp-5); color: var(--text-on-photo); background: var(--scrim-card); text-shadow: var(--text-shadow-photo); }
+.card-name { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.card-name h3 { display: flex; align-items: baseline; gap: 6px; font: var(--fw-heavy) var(--fs-title1)/var(--lh-title1) var(--font); letter-spacing: var(--ls-title); }
+.card-name h3 > span:not(.vbadge) { font-weight: var(--fw-regular); font-size: var(--fs-title3); }
+.card-score { flex: none; padding: 4px 10px; border-radius: var(--r-full); color: var(--text-on-photo); font: var(--fw-bold) var(--fs-footnote)/var(--lh-footnote) var(--font); font-variant-numeric: tabular-nums;
+  background: var(--glass-photo-score); -webkit-backdrop-filter: var(--glass-photo-filter); backdrop-filter: var(--glass-photo-filter); box-shadow: var(--glass-photo-shadow); text-shadow: none; }
+.vbadge { display: inline-grid; place-items: center; align-self: center; width: 18px; height: 18px; border-radius: var(--r-full); background: var(--super); color: var(--text-on-photo); flex: none; }
+.card-quote { margin-top: var(--sp-2); padding: 6px 12px; border-radius: var(--r-sm); font-size: 14px; line-height: 20px;
+  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+  background: var(--glass-photo-bg); -webkit-backdrop-filter: var(--glass-photo-filter); backdrop-filter: var(--glass-photo-filter); box-shadow: var(--glass-photo-shadow); }
+.card-meta { display: flex; align-items: center; gap: var(--sp-1); margin: var(--sp-2) 0; font-size: var(--fs-footnote); line-height: var(--lh-footnote); color: var(--text-on-photo-2); }
+.card-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-right: 44px; }
+.card-chip { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 4px 10px; border-radius: var(--r-full); font: var(--fw-semibold) var(--fs-caption)/var(--lh-caption) var(--font);
+  background: var(--glass-photo-bg); -webkit-backdrop-filter: var(--glass-photo-filter); backdrop-filter: var(--glass-photo-filter); box-shadow: var(--glass-photo-shadow); }
+.card-chip.hit { background: rgba(232,84,107,.6); }
+.card-chip.new { background: rgba(255,255,255,.55); color: var(--pink-900); text-shadow: none; }
+.card-more { position: absolute; right: var(--sp-4); bottom: var(--sp-4); width: 36px; height: 36px; border-radius: var(--r-full); display: grid; place-items: center; color: var(--text-on-photo);
+  background: var(--glass-photo-bg); -webkit-backdrop-filter: var(--glass-photo-filter); backdrop-filter: var(--glass-photo-filter); box-shadow: var(--glass-photo-shadow); }
+.card-more::before { content: ""; position: absolute; inset: -4px; } /* 터치 44px */
+
+/* 도장 */
+.stamp { position: absolute; top: 28px; padding: 4px 12px; border: 3px solid; border-radius: var(--r-xs); background: rgba(255,255,255,.85);
+  font: var(--fw-heavy) 22px/1.2 var(--font); opacity: 0; pointer-events: none; white-space: nowrap; }
+.stamp.yes { left: var(--sp-5); color: var(--pink-600); transform: rotate(-12deg); }
+.stamp.no { right: var(--sp-5); color: var(--gray-500); transform: rotate(12deg); }
+.stamp.sup { top: auto; bottom: 45%; left: 50%; color: var(--super); transform: translateX(-50%); }
+
+/* 좋아요 하트 */
+.cards-heart { position: absolute; left: 50%; bottom: 20%; color: var(--pink-500); pointer-events: none; z-index: 2; animation: cards-heart-float 400ms var(--e-out) forwards; }
+@keyframes cards-heart-float {
+  from { transform: translate(-50%, 0) scale(.6); opacity: 1; }
+  to { transform: translate(-50%, -80px) scale(1.2); opacity: 0; }
+}
+
+/* ---- 빈 덱 ---- */
+.deck-empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: var(--sp-8) var(--gutter); gap: var(--sp-2); }
+.deck-empty-art { width: 160px; height: 160px; object-fit: contain; mix-blend-mode: multiply; margin-bottom: var(--sp-2); }
+.deck-empty h3 { font: var(--fw-bold) var(--fs-title3)/var(--lh-title3) var(--font); letter-spacing: var(--ls-title); color: var(--text-1); }
+.deck-empty p { font-size: var(--fs-body); line-height: var(--lh-body); color: var(--text-2); margin-bottom: var(--sp-4); }
+.deck-reset { margin-top: var(--sp-3); min-height: var(--touch); font-size: var(--fs-footnote); color: var(--text-3); }
+
+@media (max-width: 760px) {
+  .deck { margin-top: 0; }
+}
