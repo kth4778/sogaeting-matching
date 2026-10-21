@@ -4,20 +4,27 @@ import { PAGES_API_BASE, STAGE_MS } from "../config.js";
 import { $, sleep, eulReul, TOP_K } from "./util.js";
 import { state, save } from "./store.js";
 import { render } from "./runtime.js";
-import { ruleFilter, embedScores, mockRerank, mockExplain, signature } from "./engine.js";
+import { ruleFilter, embedScores, oneLine, signature } from "./engine.js";
 import { logEl, logLine, logSub, logPeople, logGap, logStage, logWorking, logRankBoard, setPipe, setCount, resetPipe, dimAvatars, showLogCard, stopFollow } from "./log.js";
 
-// 진행이 눈에 보이도록 잠깐 기다린 뒤 계산한다 (계산은 engine.embedScores)
+// 서버로 보낼 프로필. 사진(특히 직접 올린 사진 데이터)은 판단에 안 쓰고 요청만 커지므로 뺀다
+const slim = ({ photo, photos, photoData, ...rest }) => rest;
+
+// 로컬 LLM 임베딩으로 줄 세운다. 서버에 Ollama가 없으면(배포판) 관심사 뜻 묶음 계산으로 대신한다
 export async function embeddingRank(me, people) {
-  await sleep(STAGE_MS.s2Embed); // 진행이 눈에 보이도록 잠깐 기다린다
-  return embedScores(me, people);
+  const local = embedScores(me, people); // 같은 뜻 관심사 쌍은 로그 칩에 쓴다
+  try {
+    const res = await api("/api/embed", { me: slim(me), people: people.map(slim) });
+    const byId = new Map(res.scores.map(s => [s.id, s.embed]));
+    const ranked = local.map(c => ({ ...c, embed: byId.get(c.profile.id) })).sort((a, b) => b.embed - a.embed);
+    return { ranked, model: res.model, ms: res.ms };
+  } catch (err) {
+    return { ranked: local, fallback: err.message };
+  }
 }
 
-// ---------- 서버 호출 (채팅만 실제 Claude) ----------
-const MOCK_API = { "/api/rerank": mockRerank, "/api/explain": mockExplain };
-
+// ---------- 서버 호출 ----------
 export async function api(path, body) {
-  if (MOCK_API[path]) { await sleep(path === "/api/rerank" ? STAGE_MS.s3Api : STAGE_MS.s4Api); return MOCK_API[path](body); }
   // GitHub Pages에서는 중계 서버(Worker)로, 로컬에서는 같은 서버의 /api로 보낸다
   const base = location.hostname.endsWith("github.io") ? PAGES_API_BASE : "";
   const res = await fetch(base + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -70,21 +77,19 @@ export async function runMatching() {
   state.step = 2;
   setPipe(1, "run");
   await sleep(STAGE_MS.s2Intro);
-  logStage(2, "임베딩 후보 추리기", "관심사를 같은 뜻끼리 묶어 비교하고, 취향이 가까운 사람을 찾습니다.",
+  logStage(2, "임베딩 후보 추리기", "관심사·소개·성격 글을 로컬 LLM(bge-m3)으로 숫자 벡터로 바꿔 나와 가까운 사람을 찾습니다.",
     "표기가 달라도(등산 ≈ 산 타기) 뜻이 비슷하면 가깝게 잡혀요. 다음 단계로 넘길 후보를 5명으로 줄입니다.");
   const w2 = logWorking(`${passed.length + 1}명의 관심사를 비교하는 중`);
-  let ranked;
-  try {
-    ranked = await embeddingRank(me, passed);
-    w2.done("비교 완료");
-  } catch (err) {
-    w2.fail(`임베딩 실패: ${err.message}`);
-    setPipe(1, "fail", "실패");
-    finish({ error: true });
-    return;
+  const emb = await embeddingRank(me, passed);
+  const ranked = emb.ranked;
+  if (emb.fallback) {
+    w2.fail("로컬 임베딩 서버 연결 실패");
+    logSub("관심사 뜻 묶음 계산으로 대신합니다", "dim");
+  } else {
+    w2.done(`비교 완료 · ${emb.model}`);
   }
   const top = ranked.slice(0, TOP_K);
-  logSub(`임베딩 코사인 유사도 상위 ${top.length}명`);
+  logSub(`${emb.fallback ? "뜻 묶음" : "임베딩 코사인"} 유사도 상위 ${top.length}명`);
   logPeople(top.map(c => ({
     profile: c.profile,
     chips: [c.pair.sim >= 0.9 ? `${c.pair.a} ≈ ${c.pair.b}` : null,
@@ -101,13 +106,13 @@ export async function runMatching() {
   // 3단계
   state.step = 3;
   setPipe(2, "run");
-  logStage(3, "LLM 재순위 (데모: 점수표 계산)", `${top.length}명을 지역·성향·생활 습관 점수표로 다시 줄 세웁니다.`,
-    "지역·성향·생활 리듬·술·나이 차를 점수표로 더해 다시 줄 세워요");
-  const w3 = logWorking(`${top.length}명 점수 매기는 중`);
+  logStage(3, "LLM 재순위", `Claude가 ${top.length}명의 프로필을 읽고 다시 줄 세웁니다.`,
+    "임베딩은 글이 비슷한지만 봐요. LLM은 성격·대화 스타일·생활 리듬까지 읽고 실제로 잘 통할 순서로 바꿉니다.");
+  const w3 = logWorking(`${top.length}명 프로필 읽는 중`);
   let final;
   try {
-    const res = await api("/api/rerank", { me, candidates: top.map(c => ({ profile: c.profile, embed: c.embed })) });
-    w3.done("점수 계산 완료");
+    const res = await api("/api/rerank", { me: slim(me), candidates: top.map(c => ({ profile: slim(c.profile), embed: c.embed })) });
+    w3.done("재순위 완료");
     const scoreOf = new Map(res.ranking.map(r => [r.id, r]));
     final = top
       .filter(c => scoreOf.has(c.profile.id))
@@ -119,7 +124,7 @@ export async function runMatching() {
   } catch (err) {
     w3.fail(`실패: ${err.message}`);
     logSub("임베딩 순서를 그대로 씁니다", "dim");
-    final = top.map(c => ({ ...c, llmScore: Math.round(c.embed * 100), oneLine: "관심사와 소개가 비슷해요" }));
+    final = top.map(c => ({ ...c, llmScore: Math.round(c.embed * 100), oneLine: oneLine(me, c.profile) }));
     setPipe(2, "fail", "LLM 미연결");
   }
   setCount(1);
@@ -129,10 +134,14 @@ export async function runMatching() {
   setPipe(3, "run");
   logStage(4, "LLM 이유 설명", `1위 ${eulReul(final[0].profile.name)} 고른 이유를 두 사람 프로필에 적힌 내용만으로 씁니다.`,
     "점수만 보여 주면 왜 1위인지 알 수 없어요. 사람이 읽을 수 있는 이유로 바꿔 화면에 보여 줍니다.");
-  const w4 = logWorking("이유 정리하는 중");
+  const w4 = logWorking(`${final.length}명 이유 쓰는 중`);
+  // 1위 이유를 화면에 보여 주고, 2~5위 이유는 상세 화면용으로 같이 받는다 (동시에 요청)
+  const explains = await Promise.all(final.map(c =>
+    api("/api/explain", { me: slim(me), partner: slim(c.profile), embed: c.embed, llmScore: c.llmScore }).catch(err => ({ error: err.message }))));
   let explain = null;
   try {
-    const res = await api("/api/explain", { me, partner: final[0].profile, embed: final[0].embed, llmScore: final[0].llmScore });
+    const res = explains[0];
+    if (res.error) throw new Error(res.error);
     w4.done("이유 정리 완료");
     explain = res;
     logSub(`“${res.headline}”`, "hl");
@@ -149,8 +158,8 @@ export async function runMatching() {
   logLine("완료", `총 ${((performance.now() - startedAt) / 1000).toFixed(1)}초 · ${PROFILES.length}명 → ${passed.length}명 → ${top.length}명 → 1위 ${final[0].profile.name} (${final[0].llmScore}점)`, "ok");
   finish({
     ranked: final.map((c, i) => {
-      // 2~5위도 이유를 저장한다(목 계산이라 대기 없음). 상세 화면은 표시만 한다
-      const ex = i === 0 ? explain : mockExplain({ me, partner: c.profile });
+      // 2~5위도 이유를 저장한다. 상세 화면은 표시만 한다
+      const ex = explains[i]?.error ? null : explains[i];
       return { id: c.profile.id, embed: c.embed, jaccard: c.jaccard, pair: c.pair, llmScore: c.llmScore, oneLine: c.oneLine,
         before: top.findIndex(t => t.profile.id === c.profile.id) + 1, headline: ex?.headline, reasons: ex?.reasons.slice(0, 2) };
     }),
