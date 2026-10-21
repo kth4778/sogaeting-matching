@@ -66,6 +66,7 @@ export function profileHtml() {
       ${row("흡연", w.nonSmokerOnly ? "비흡연자만" : "상관없음")}${row("종교", w.religion)}`, "이 조건에 맞는 사람만 추천해요")}
     <section class="me-card me-list">
       ${canInstall ? `<button class="list-row" data-act="me-install"><span>앱으로 설치하기</span>${icon("chevron-right", 16)}</button>` : ""}
+      <button class="list-row" data-act="guide-open"><span>사용 방법 보기</span>${icon("chevron-right", 16)}</button>
       <button class="list-row" data-act="me-blocked"><span>차단한 사람</span><em>${blocked}명</em>${icon("chevron-right", 16)}</button>
       <button class="list-row" data-act="me-safety"><span>안전 수칙</span>${icon("chevron-right", 16)}</button>
       <button class="list-row" data-act="me-terms"><span>약관·개인정보 처리방침</span>${icon("chevron-right", 16)}</button>

@@ -50,7 +50,7 @@ function content() {
 }
 
 function showHint({ manual = false } = {}) {
-  if (document.querySelector(".overlay.ob-mode")) return false; // 가입 흐름 중: 이번 기회는 건너뛴다
+  if (document.querySelector(".overlay.ob-mode, .overlay.guide-mode")) return false; // 가입 흐름·사용 안내 중: 이번 기회는 건너뛴다
   if (document.querySelector(".install-hint")) return true;
   const { html, label, go } = content();
   const hint = document.createElement("div");

@@ -1,6 +1,7 @@
 // 앱 시작점: 화면 그리기 규약(render), 클릭 위임, 탭바(배지·스크롤 기억), 가상 폰 크기, 키보드 높이, 스플래시
 // 화면 모듈을 불러오면 각자 registerScreen·registerOverlay·registerActions로 등록된다 (오버레이 우선순위 = 불러온 순서)
 import "./screens/onboarding.js";
+import "./screens/guide.js";
 import "./screens/home.js";
 import "./screens/cards.js";
 import "./screens/detail.js";

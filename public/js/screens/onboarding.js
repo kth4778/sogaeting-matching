@@ -7,6 +7,7 @@ import { toast } from "../ui/toast.js";
 import { openSheet } from "../ui/sheet.js";
 import { pauseOffscreen, DUR, EASE, REDUCE } from "../ui/motion.js";
 import { playWelcomeHero } from "../ui/brand.js";
+import { openGuideOnce } from "./guide.js";
 import {
   STEPS as OB_STEPS, INTEREST_MAX, PHOTO_MAX, MBTI_UNKNOWN, CONSENTS, TEXT_RULE,
   blankDraft, onboardingHtml, setField, getField, ctaLabel, helpHtml,
@@ -79,6 +80,7 @@ export function finishOnboarding() {
     else state.tab = "home";
     render();
     // 매칭은 매칭 탭의 「매칭 시작」을 눌러야 돈다. 결과는 지우지 않는다(무효화는 서명 비교)
+    if (!ob.editing) openGuideOnce();
   };
   const el = $("#overlay");
   if (!ob.editing && el && !REDUCE) {
