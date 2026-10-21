@@ -146,7 +146,7 @@ export function onboardingHtml(ob) {
   if (step.key === "welcome") {
     return `
       <div class="ob welcome enter-${dir}">
-        <div class="welcome-art"><img src="logo.jpg?v=4" alt=""><span class="pen">오늘, 누구와?</span></div>
+        <div class="welcome-art"><img src="logo.png?v=4" alt=""><span class="pen">오늘, 누구와?</span></div>
         <h2>마음이 통하는 한 사람,<br>이유까지 알려드릴게요</h2>
         <p>취향, 성격, 생활 습관까지 살펴보고<br>왜 잘 맞는지도 함께 알려드려요.</p>
         <div class="ob-foot">
