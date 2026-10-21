@@ -83,20 +83,6 @@ export function embedScores(me, people) {
   }).sort((x, y) => y.embed - x.embed);
 }
 
-// ---------- 3·4단계: LLM 재순위·이유 설명 (목데이터) ----------
-// 실제 API 대신 점수표로 바로 만든다. 무엇에 몇 점을 줬는지 그대로 이유가 된다.
-export function mockScore(me, p, embed) {
-  const parts = [
-    ["취향", Math.round(embed * 50)],
-    ["같은 지역", me.region === p.region ? 12 : 0],
-    ["성향(E/I)", me.mbti[0] === p.mbti[0] ? 8 : 0],
-    ["생활 리듬(J/P)", me.mbti[3] === p.mbti[3] ? 6 : 0],
-    ["술 습관", me.drinking === p.drinking ? 6 : 0],
-    ["나이 차", Math.abs(me.age - p.age) <= 3 ? 8 : 3],
-  ];
-  return { score: Math.min(98, parts.reduce((s, [, v]) => s + v, 0)), parts };
-}
-
 // 결과·카드·상세·대화방이 같이 쓰는 한 줄 설명 (§4.6 표 순서로 최대 2개)
 export function oneLine(me, p) {
   const out = [];
@@ -109,29 +95,6 @@ export function oneLine(me, p) {
   if (me.mbti[3] === p.mbti[3]) out.push("계획 스타일이 같아요");
   if (Math.abs(me.age - p.age) <= 3) out.push("나이 차가 적어요");
   return out.slice(0, 2).join(" · ") || "새로운 취향을 알아가기 좋아요";
-}
-
-// "/api/rerank" 목 응답 (대기는 matching.js api()가 한다)
-export function mockRerank({ me, candidates }) {
-  return {
-    ranking: candidates.map(c => ({ id: c.profile.id, score: mockScore(me, c.profile, c.embed).score, oneLine: oneLine(me, c.profile) })),
-  };
-}
-
-// "/api/explain" 목 응답
-export function mockExplain({ me, partner }) {
-  const shared = partner.interests.filter(t => me.interests.some(m => groupOf(m) >= 0 && groupOf(m) === groupOf(t)));
-  const likes = (shared.length ? shared : partner.interests).slice(0, 2);
-  return {
-    headline: shared.length ? `${josa(shared[0], "을/를")} 함께 즐길 수 있는 사람이에요` : "생활 리듬이 비슷한 사람이에요",
-    reasons: [
-      { title: "비슷한 취향", detail: `${partner.name}님도 ${[...likes.slice(0, -1), josa(likes[likes.length - 1], "을/를")].join(", ")} 좋아해요.` },
-      { title: "가까운 거리", detail: me.region === partner.region ? `둘 다 ${me.region}에 있어서 만나기 편해요.` : `${partner.region}에 있어서 중간에서 만나면 좋아요.` },
-      { title: "대화 스타일", detail: `${partner.personality}` },
-    ],
-    caution: me.mbti[0] === "I" && partner.mbti[0] === "I" ? "둘 다 조용한 편이라 처음엔 먼저 말을 걸어 보세요." : "대화 속도가 다를 수 있으니 천천히 알아가 보세요.",
-    firstDate: shared.length ? `${shared[0]} 후에 근처 카페에서 이야기 나눠 보세요.` : "가볍게 카페에서 만나 보세요.",
-  };
 }
 
 // ---------- 조사·서명 ----------
