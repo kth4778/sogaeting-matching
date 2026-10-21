@@ -3,10 +3,11 @@ import { SAMPLE_PROFILES } from "../data/profiles.js";
 import { $ } from "../core/util.js";
 import { state, save, registerReset } from "../core/store.js";
 import { registerOverlay, registerActions, render, pushRoute, backRoute } from "../core/runtime.js";
-import { runMatching } from "../core/matching.js";
 import { toast } from "../ui/toast.js";
 import { openSheet } from "../ui/sheet.js";
 import { pauseOffscreen, DUR, EASE, REDUCE } from "../ui/motion.js";
+import { playWelcomeHero } from "../ui/brand.js";
+import { openGuideOnce } from "./guide.js";
 import {
   STEPS as OB_STEPS, INTEREST_MAX, PHOTO_MAX, MBTI_UNKNOWN, CONSENTS, TEXT_RULE,
   blankDraft, onboardingHtml, setField, getField, ctaLabel, helpHtml,
@@ -73,14 +74,13 @@ export function finishOnboarding() {
     save("me", d);
   }
   clearDraft();
-  const first = !ob.editing && !state.result;
   const done = () => {
     state.ob = null;
     if (ob.editing) { state.tab = "me"; toast("저장했어요", { duration: SAVED_TOAST_MS }); }
     else state.tab = "home";
     render();
-    // 첫 가입이면 바로 첫 매칭을 돌린다. 결과는 지우지 않는다(무효화는 서명 비교)
-    if (first) runMatching();
+    // 매칭은 매칭 탭의 「매칭 시작」을 눌러야 돈다. 결과는 지우지 않는다(무효화는 서명 비교)
+    if (!ob.editing) openGuideOnce();
   };
   const el = $("#overlay");
   if (!ob.editing && el && !REDUCE) {
@@ -250,8 +250,14 @@ let lastRatio = null;
 function startHero(overlay) {
   const hero = overlay.querySelector(".hero");
   if (!hero) return;
-  const go = () => { stopHero?.(); stopHero = pauseOffscreen(hero); };
-  if (document.body.classList.contains("booting")) {
+  // 스플래시가 로고를 그리고 있었으면 히어로는 그 다음 장면부터 이어 간다
+  const drawn = document.body.classList.contains("booting");
+  const go = () => {
+    stopHero?.();
+    const unpause = pauseOffscreen(hero), stopFilm = playWelcomeHero(hero, { drawn });
+    stopHero = () => { unpause(); stopFilm(); };
+  };
+  if (drawn) {
     hero.classList.add("paused");
     window.addEventListener("splash:done", () => { hero.classList.remove("paused"); if (hero.isConnected) go(); }, { once: true });
   } else go();

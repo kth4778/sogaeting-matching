@@ -35,7 +35,7 @@ export const state = {
 };
 
 // 「데모 초기화」: 앱 키를 지우고 상태를 처음으로 되돌린 뒤 등록된 초기화를 실행한다
-const APP_KEYS = ["me", "result", "swiped", "matches", "chats", "ended", "blocked", "unread", "daily", "coach"];
+const APP_KEYS = ["me", "result", "swiped", "matches", "chats", "ended", "blocked", "unread", "daily", "coach", "guide-seen"];
 const resets = [];
 export function registerReset(fn) { resets.push(fn); }
 export function resetAll() {
