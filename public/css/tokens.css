@@ -119,7 +119,7 @@
   /* ---- z-index ---- */
   --z-screen: 1; --z-appbar: 10; --z-tabbar: 15; --z-fade: 14; --z-overlay: 20;
   --z-toast: 40; --z-hint: 44; --z-notice: 45; --z-sheet: 50; --z-modal: 55;
-  --z-statusbar: 60; --z-splash: 80;
+  --z-statusbar: 60;
 
   /* ---- 모션: 시간 ---- */
   --m-press: 100ms;   /* 누름 */

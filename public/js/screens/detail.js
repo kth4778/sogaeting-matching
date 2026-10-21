@@ -63,8 +63,8 @@ function actionsHtml(id) {
   }
   return `
     <button class="act" data-act="detail-pass:${id}"><span class="circle pass">${icon("x", 26)}</span><small>넘기기</small></button>
-    <button class="act" data-act="detail-like:${id}"><span class="circle like">${icon("heart-fill", 30)}</span><small>좋아요</small></button>
-    <button class="act" data-act="detail-super:${id}"><span class="circle super">${icon("star-fill", 24)}</span><small>슈퍼 좋아요</small></button>`;
+    <button class="act" data-act="detail-super:${id}"><span class="circle super">${icon("star-fill", 24)}</span><small>슈퍼 좋아요</small></button>
+    <button class="act" data-act="detail-like:${id}"><span class="circle like">${icon("heart-fill", 30)}</span><small>좋아요</small></button>`;
 }
 
 export function detailHtml(id) {

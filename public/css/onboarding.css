@@ -74,7 +74,6 @@
 .ob-photo-main { position: absolute; left: 6px; top: 6px; padding: 2px 8px; border-radius: var(--r-full); background: rgba(0,0,0,.45); color: #fff; font-size: 11px; font-weight: 600; }
 .ob-photo-x { position: absolute; right: 6px; top: 6px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; }
 /* 웰컴 */
-.ob.welcome { padding-top: 0; gap: 0; }
 /* 완료·요약 */
 .ob.done { text-align: center; }
 .ob.done .ob-body { padding-top: 28px; }
@@ -108,32 +107,31 @@
 .sample-info small { display: block; font-size: 12px; color: var(--text-2); margin: 3px 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sample-info .chip { font-size: 11px; padding: 4px 9px; margin: 0 3px 4px 0; }
 .chev { font-size: 24px; color: var(--gray-300); }
-/* 웰컴 히어로: ui/brand.js가 매 프레임 transform·clip-path를 정한다. 여기서는 처음 모양과 크기만 (크기 단위는 히어로 상자 기준 cqw·cqh) */
-.hero { position: relative; flex: 1; min-height: 300px; overflow: hidden; border-radius: 30px; margin-top: 6px; background: var(--surface-brand); box-shadow: var(--card-shadow); container-type: size; --u: min(1cqw, .78cqh); }
-.film-hero > * { position: absolute; }
-.fh-mark { left: 50%; top: 44%; width: 46cqw; height: 46cqw; z-index: 3; visibility: hidden; }
-.fh-mark svg { width: 100%; height: 100%; overflow: visible; }
-.fh-word { left: 20cqw; top: calc(9% - 3.4cqw); font-size: 5.6cqw; font-weight: 800; letter-spacing: -.04em; color: var(--text-1); z-index: 3; }
-.fh-flood { inset: 0; background: var(--pink-500); z-index: 5; visibility: hidden; }
-.fh-k { position: absolute; left: 8cqw; font-size: 15cqw; font-weight: 900; letter-spacing: -.06em; color: #fff; }
-.fh-k:nth-child(1) { top: 18%; } .fh-k:nth-child(2) { top: 36%; } .fh-k:nth-child(3) { top: 54%; }
-.fh-card { left: 0; top: 0; width: calc(var(--u) * 42); height: calc(var(--u) * 56); border-radius: calc(var(--u) * 5); overflow: hidden; background: var(--gray-100); z-index: 6; visibility: hidden; box-shadow: 0 calc(var(--u) * 3) calc(var(--u) * 8) rgba(40, 10, 20, .22); will-change: transform; }
-.fh-card i { position: absolute; inset: 0; background-size: cover; background-position: center 28%; }
-.fh-card b { position: absolute; left: 0; right: 0; bottom: 0; padding: calc(var(--u) * 11) calc(var(--u) * 3.6) calc(var(--u) * 3.6); color: var(--text-on-photo); font-size: calc(var(--u) * 4.8); font-weight: 800; letter-spacing: -.03em; background: var(--scrim-card); }
-.fh-card b small { font-size: calc(var(--u) * 3.6); font-weight: 500; opacity: .85; }
-.fh-like { position: absolute; right: calc(var(--u) * 2.5); bottom: calc(var(--u) * 2.5); width: calc(var(--u) * 9); height: calc(var(--u) * 9); border-radius: 50%; background: #fff; color: var(--pink-500); display: grid; place-items: center; }
-.fh-like svg { width: calc(var(--u) * 4.8); height: calc(var(--u) * 4.8); fill: currentColor; }
-.fh-like.on { background: var(--pink-500); color: #fff; }
-.story { margin: 14px 0 6px; overflow: hidden; }
-.story-track { display: flex; animation: storySlide 12s infinite; }
-.story-card { flex: 0 0 100%; display: flex; align-items: center; gap: 12px; padding: 4px 2px; }
-.story-card img { width: 78px; height: 78px; border-radius: 20px; object-fit: cover; flex-shrink: 0; mix-blend-mode: multiply; }
-.story-card b { display: block; font-size: 17px; letter-spacing: -.02em; }
-.story-card p { font-size: 13px; color: var(--text-2); line-height: 1.5; margin-top: 3px; }
-.story-dots { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
-.story-dots i { width: 6px; height: 6px; border-radius: 3px; background: #e5e5ea; animation: dot 12s infinite; }
-.story-dots i:nth-child(2) { animation-delay: 4s; }
-.story-dots i:nth-child(3) { animation-delay: 8s; }
+/* 첫 화면 소개 영상: ui/brand.js가 매 프레임 transform·clip-path를 정한다. 여기서는 처음 모양과 크기만.
+   크기 단위는 첫 화면 전체 기준(cqw·cqh). 로고(3) < 분홍(5) < 카드(6) < 버튼(7) 순서로 겹친다. */
+.ob.welcome { position: relative; container-type: size; overflow: clip; }
+.ob.welcome .ob-foot { margin-top: auto; position: relative; z-index: 7; visibility: hidden; }
+.intro { position: absolute; top: 0; bottom: 0; left: var(--gutter); right: var(--gutter); --u: min(1cqw, .55cqh); }
+.intro > * { position: absolute; left: 0; top: 0; }
+.it-mark { width: 52cqw; height: 52cqw; z-index: 3; }
+.it-mark svg { width: 100%; height: 100%; overflow: visible; }
+.it-word { display: flex; gap: 2.6cqw; font-size: 11cqw; font-weight: 800; letter-spacing: -.045em; color: var(--text-1); transform-origin: 0 50%; z-index: 3; white-space: nowrap; }
+.it-hero { left: 50%; top: 30cqh; width: 100%; height: 42cqh; background: var(--surface-brand); border-radius: 7cqw; z-index: 2; visibility: hidden; }
+.it-card { width: calc(var(--u) * 46); height: calc(var(--u) * 61); border-radius: calc(var(--u) * 5); overflow: hidden; background: var(--gray-100); z-index: 6; visibility: hidden; box-shadow: 0 calc(var(--u) * 3) calc(var(--u) * 8) rgba(40, 10, 20, .22); will-change: transform; }
+.it-card i { position: absolute; inset: 0; background-size: cover; background-position: center 28%; }
+.it-card b { position: absolute; left: 0; right: 0; bottom: 0; padding: calc(var(--u) * 12) calc(var(--u) * 4) calc(var(--u) * 4); color: var(--text-on-photo); font-size: calc(var(--u) * 5.2); font-weight: 800; letter-spacing: -.03em; background: var(--scrim-card); }
+.it-card b small { font-size: calc(var(--u) * 4); font-weight: 500; opacity: .85; }
+.it-like { position: absolute; right: calc(var(--u) * 3); bottom: calc(var(--u) * 3); width: calc(var(--u) * 10); height: calc(var(--u) * 10); border-radius: 50%; background: #fff; color: var(--pink-500); display: grid; place-items: center; }
+.it-like svg { width: calc(var(--u) * 5.4); height: calc(var(--u) * 5.4); fill: currentColor; }
+.it-like.on { background: var(--pink-500); color: #fff; }
+.it-title { top: 55cqh; font-size: 7.2cqw; font-weight: 800; letter-spacing: -.045em; line-height: 1.3; z-index: 3; }
+.it-desc { top: calc(55cqh + 22cqw); font-size: 3.9cqw; color: var(--text-2); z-index: 3; }
+.it-title .mask, .it-desc .mask { position: relative; }
+.it-flood { position: absolute; inset: 0; background: var(--pink-500); z-index: 5; visibility: hidden; }
+.it-k { position: absolute; left: calc(var(--gutter) + 4cqw); font-size: 17cqw; font-weight: 900; letter-spacing: -.06em; color: #fff; }
+.it-k:nth-child(1) { top: 16cqh; } .it-k:nth-child(2) { top: calc(16cqh + 19cqw); } .it-k:nth-child(3) { top: calc(16cqh + 38cqw); }
+.it-cap { position: absolute; left: calc(var(--gutter) + 4cqw); font-size: 7.4cqw; font-weight: 700; letter-spacing: -.04em; color: var(--text-1); }
+.it-cap:nth-child(4) { top: 74cqh; } .it-cap:nth-child(5) { top: calc(74cqh + 10cqw); }
 
 @keyframes ob-tap { 50% { transform: scale(1.06); } }
 @keyframes ob-check-draw { to { stroke-dashoffset: 0; } }

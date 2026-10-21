@@ -17,10 +17,6 @@
 @keyframes kenburns { to { transform: scale(1.09) translate(-1%, -1%); } }
 @keyframes petal { 0% { translate: 0 0; rotate: 0deg; opacity: 0; } 10% { opacity: 1; } 100% { translate: 40px 600px; rotate: 300deg; opacity: 0; } }
 @keyframes spin { to { transform: rotate(360deg); } }
-@keyframes splashOut { to { opacity: 0; } }
-@keyframes splashDot { from { transform: scale(0); } to { transform: none; } }
-@keyframes splashDraw { to { stroke-dashoffset: 0; } }
-@keyframes splashRise { from { transform: translate3d(0, 125%, 0); } to { transform: none; } }
 @keyframes badgePop { 0% { transform: scale(0); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
 @keyframes rollIn { from { opacity: 0; transform: translateY(60%); } to { opacity: 1; transform: none; } }
 @keyframes rollOut { to { opacity: 0; transform: translateY(-60%); } }
@@ -28,8 +24,6 @@
 /* 옛 keyframes: 아직 화면 파일이 참조함(각 WP가 자기 접두사 이름으로 옮기면 통합 정리에서 삭제) */
 @keyframes enterFwd { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
 @keyframes enterBack { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
-@keyframes storySlide { 0%, 28% { transform: none; } 33%, 61% { transform: translateX(-100%); } 66%, 94% { transform: translateX(-200%); } 100% { transform: none; } }
-@keyframes dot { 0%, 30% { width: 18px; background: var(--pink-500); } 34%, 100% { width: 6px; background: var(--gray-200); } }
 
 .enter-fwd { animation: enterFwd var(--m-slow) var(--e-nav); }
 .enter-back { animation: enterBack var(--m-slow) var(--e-nav); }

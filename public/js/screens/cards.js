@@ -32,8 +32,8 @@ export function actionButtons(id) {
   return `
     <button class="act act-undo" data-act="undo" aria-label="되돌리기"${canUndo ? "" : " aria-disabled=\"true\""}><span class="circle">${icon("undo", 20)}</span></button>
     <button class="act" data-act="pass:${id}"><span class="circle pass">${icon("x", 26)}</span><small>넘기기</small></button>
-    <button class="act" data-act="like:${id}"><span class="circle like">${icon("heart-fill", 30)}</span><small>좋아요</small></button>
-    <button class="act${left ? "" : " is-empty"}" data-act="super:${id}" aria-label="슈퍼 좋아요 · 상대 카드 맨 앞에 보여요 · 오늘 ${left}번 남음"><span class="circle super">${icon("star-fill", 24)}</span><small>슈퍼 좋아요 ${left}</small></button>`;
+    <button class="act${left ? "" : " is-empty"}" data-act="super:${id}" aria-label="슈퍼 좋아요 · 상대 카드 맨 앞에 보여요 · 오늘 ${left}번 남음"><span class="circle super">${icon("star-fill", 24)}</span><small>슈퍼 좋아요 ${left}</small></button>
+    <button class="act" data-act="like:${id}"><span class="circle like">${icon("heart-fill", 30)}</span><small>좋아요</small></button>`;
 }
 
 export function deckPeople() {

@@ -42,14 +42,6 @@ body.no-tabbar .phone-screen::after { display: none; }
 .appbar .muted { font-size: 14px; line-height: 20px; font-weight: var(--fw-regular); letter-spacing: 0; color: var(--text-2); font-variant-numeric: tabular-nums; }
 
 /* 스플래시 */
-.splash { position: absolute; inset: 0; z-index: var(--z-splash); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-3); background: radial-gradient(600px 500px at 50% 40%, var(--pink-100), var(--bg) 70%); }
-.splash .mark { width: 176px; height: 176px; overflow: visible; }
-.splash .mark circle { transform-box: fill-box; transform-origin: center; animation: splashDot var(--m-slow) var(--e-out) both; }
-.splash .mark circle:last-of-type { animation-delay: 150ms; }
-.splash .mark path { animation: splashDraw 700ms var(--e-move) 250ms forwards; }
-.splash h1 { margin-top: -28px; font-size: 30px; font-weight: 800; letter-spacing: -.04em; color: var(--text-1); }
-.splash h1 .mask-in { animation: splashRise 420ms var(--e-out) 760ms both; }
-.splash.out { animation: splashOut 300ms var(--e-in) forwards; pointer-events: none; }
 body.booting .ob.welcome * { animation-play-state: paused; }
 
 /* 설치 안내(chrome 레시피) */
