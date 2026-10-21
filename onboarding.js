@@ -144,14 +144,40 @@ export function onboardingHtml(ob) {
   }
 
   if (step.key === "welcome") {
+    // 위: 사람들이 로고 주위를 돌고, 그중 두 사람이 하트로 이어지는 모션 / 아래: 서비스 소개 3장이 자동으로 넘어감
+    const ring = (ids, cls) => `<div class="orbit ${cls}">${ids.map((id, i) => `
+      <span class="orb" style="--a:${(360 / ids.length) * i}deg"><i style="background-image:url(photos/${id}.jpg?v=4)"></i></span>`).join("")}</div>`;
+    const STORY = [
+      ["intro-1.jpg", "조건부터 서로 맞춰 봐요", "나이·흡연·종교, 서로의 조건이 맞는 사람만 남겨요"],
+      ["intro-2.jpg", "취향이 닮은 사람을 찾아요", "등산과 산 타기처럼 말이 달라도 같은 취향을 알아봐요"],
+      ["intro-3.jpg", "왜 잘 맞는지 알려드려요", "점수만이 아니라 이유와 첫 만남 제안까지"],
+    ];
     return `
       <div class="ob welcome enter-${dir}">
-        <div class="welcome-art"><img src="logo.png?v=4" alt=""><span class="pen">오늘, 누구와?</span></div>
-        <h2>마음이 통하는 한 사람,<br>이유까지 알려드릴게요</h2>
-        <p>취향, 성격, 생활 습관까지 살펴보고<br>왜 잘 맞는지도 함께 알려드려요.</p>
+        <div class="hero">
+          ${ring(["p01", "p13", "p07", "p16", "p05", "p12"], "orbit-in")}
+          ${ring(["p02", "p11", "p09", "p20", "p06", "p17", "p08", "p19"], "orbit-out")}
+          <div class="hero-core">
+            <img src="logo.png?v=4" alt="">
+            <span class="hero-heart">♥</span>
+          </div>
+          <div class="hero-pair">
+            <i style="background-image:url(photos/me-f.jpg?v=4)"></i>
+            <svg viewBox="0 0 120 30"><path d="M4 15 C 40 -5, 80 35, 116 15" /></svg>
+            <i style="background-image:url(photos/me-m.jpg?v=4)"></i>
+          </div>
+          <span class="pen hero-title">오늘, 누구와?</span>
+        </div>
+        <div class="story">
+          <div class="story-track">${STORY.map(([img, title, desc]) => `
+            <div class="story-card"><img src="${img}" alt=""><div><b>${title}</b><p>${desc}</p></div></div>`).join("")}
+          </div>
+          <div class="story-dots"><i></i><i></i><i></i></div>
+        </div>
         <div class="ob-foot">
           <button class="btn" data-act="ob-next">내 프로필 만들기</button>
           <button class="btn line" data-act="ob-pick-open">예시 프로필로 체험하기</button>
+        </div>
       </div>`;
   }
 

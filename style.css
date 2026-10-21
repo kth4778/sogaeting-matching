@@ -689,3 +689,56 @@ button, a, .card, .act, .chip, .rank-row, .row { touch-action: manipulation; }
 .share-ic { display: inline-block; width: 12px; height: 14px; vertical-align: -2px; background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 14' fill='none' stroke='%23007aff' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M6 1v8M3.5 3.5 6 1l2.5 2.5M3 6H1.5v7h9V6H9'/%3E%3C/svg%3E"); }
 .install-go { padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; color: #fff; background: var(--pink); flex-shrink: 0; }
 .install-x { width: 28px; height: 28px; border-radius: 50%; font-size: 13px; color: var(--sub); flex-shrink: 0; }
+
+/* =========================================================
+   첫 화면 모션: 사람들이 로고 주위를 돌고, 두 사람이 하트로 이어진다
+   ========================================================= */
+.ob.welcome { padding-top: 0; gap: 0; }
+.hero { position: relative; flex: 1; min-height: 300px; display: grid; place-items: center; overflow: hidden;
+  border-radius: 30px; margin-top: 6px; background: radial-gradient(260px 220px at 50% 45%, #ffe1e7, #fff4f6 60%, #fff 100%); box-shadow: var(--glass-edge); }
+.orbit { position: absolute; left: 50%; top: 45%; width: 0; height: 0; animation: spin 46s linear infinite; }
+.orbit-out { animation-duration: 70s; animation-direction: reverse; }
+.orb { position: absolute; left: 0; top: 0; transform: rotate(var(--a)) translateY(var(--r)) rotate(calc(-1 * var(--a))); }
+.orbit-in .orb { --r: -92px; }
+.orbit-out .orb { --r: -148px; }
+.orb i { display: block; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: #eee center/cover;
+  border: 3px solid rgba(255,255,255,.9); box-shadow: 0 6px 16px rgba(40, 20, 30, .18); animation: counter 46s linear infinite, bob 4s ease-in-out infinite; }
+.orbit-out .orb i { width: 38px; height: 38px; margin: -19px 0 0 -19px; opacity: .85; animation: counter-rev 70s linear infinite, bob 5s ease-in-out infinite; }
+.orb:nth-child(odd) i { animation-delay: 0s, -2s; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes counter { to { rotate: -360deg; } }
+@keyframes counter-rev { to { rotate: 360deg; } }
+@keyframes bob { 50% { translate: 0 -5px; } }
+.hero-core { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); }
+.hero-core img { width: 84px; height: 84px; border-radius: 24%; box-shadow: 0 14px 34px rgba(232, 84, 107, .35); animation: breathe 3.2s ease-in-out infinite; }
+.hero-heart { position: absolute; right: -10px; top: -10px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; color: #fff;
+  background: linear-gradient(180deg, #f06d84, #e2486a); box-shadow: 0 6px 14px rgba(232, 84, 107, .45); animation: beat 1.6s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(1.04); } }
+@keyframes beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.25); } 30% { transform: scale(.95); } 45% { transform: scale(1.12); } }
+/* 두 사람이 다가와 선으로 이어지는 장면이 반복된다 */
+.hero-pair { position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%); display: flex; align-items: center; }
+.hero-pair i { width: 54px; height: 54px; border-radius: 50%; background: #eee center/cover; border: 3px solid #fff; box-shadow: 0 8px 18px rgba(40, 20, 30, .2); animation: pairL 6s ease-in-out infinite; }
+.hero-pair i:last-child { animation-name: pairR; }
+.hero-pair svg { width: 92px; height: 30px; margin: 0 -6px; overflow: visible; }
+.hero-pair path { fill: none; stroke: #e8546b; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 140; stroke-dashoffset: 140; animation: draw 6s ease-in-out infinite; filter: drop-shadow(0 0 4px rgba(232, 84, 107, .6)); }
+@keyframes pairL { 0%, 100% { transform: translateX(-26px); opacity: .6; } 30%, 80% { transform: none; opacity: 1; } }
+@keyframes pairR { 0%, 100% { transform: translateX(26px); opacity: .6; } 30%, 80% { transform: none; opacity: 1; } }
+@keyframes draw { 0%, 25% { stroke-dashoffset: 140; } 45%, 80% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -140; } }
+.hero-title { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; font-size: 34px; color: var(--pink); }
+
+/* 서비스 소개 3장: 자동으로 넘어간다 */
+.story { margin: 14px 0 6px; overflow: hidden; }
+.story-track { display: flex; animation: storySlide 12s infinite; }
+.story-card { flex: 0 0 100%; display: flex; align-items: center; gap: 12px; padding: 4px 2px; }
+.story-card img { width: 78px; height: 78px; border-radius: 20px; object-fit: cover; flex-shrink: 0; mix-blend-mode: multiply; }
+.story-card b { display: block; font-size: 17px; letter-spacing: -.02em; }
+.story-card p { font-size: 13px; color: var(--sub); line-height: 1.5; margin-top: 3px; }
+.story-dots { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
+.story-dots i { width: 6px; height: 6px; border-radius: 3px; background: #e5e5ea; animation: dot 12s infinite; }
+.story-dots i:nth-child(2) { animation-delay: 4s; } .story-dots i:nth-child(3) { animation-delay: 8s; }
+@keyframes storySlide { 0%, 28% { transform: none; } 33%, 61% { transform: translateX(-100%); } 66%, 94% { transform: translateX(-200%); } 100% { transform: none; } }
+@keyframes dot { 0%, 30% { width: 18px; background: var(--pink); } 34%, 100% { width: 6px; background: #e5e5ea; } }
+@media (prefers-reduced-motion: reduce) { .orbit, .orb i, .hero-pair *, .story-track, .story-dots i, .hero-core *, .hero-heart { animation: none !important; } }
+.orbit, .hero-core { top: 42%; }
+.hero-pair { bottom: 58px; }
+.hero-title { font-size: 30px; bottom: 12px; }
