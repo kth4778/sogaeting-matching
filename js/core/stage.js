@@ -202,16 +202,40 @@ export async function stageRules({ passed, excluded }) {
 }
 
 // ---------- 2단계: 임베딩 ----------
-// 한 사람 = 한 줄. 사진 · 이름 · 나와 비슷한 정도 막대 · 실제 코사인 값. 응답이 오면 막대가 실제 값까지 자라고 순서대로 다시 선다
-const ROW_TOP = 64, ROW_H = 38, ROW_MAX = 8, PH_X = 30, PH = 28;
-const rowY = i => ROW_TOP + i * ROW_H + ROW_H / 2;
+// 2차원 지도. 가운데 = 나. 거리 = 1 − 코사인(실제 값, 동심원 눈금), 방향 = 벡터를 2차원(PCA)으로 줄인 방향.
+// 사진끼리 겹치면 거리는 그대로 두고 각도만 벌린다
+const G_H = 290, G_PAD = 24, NEAR = 30, GAP = 34;
+const SVGNS = "http://www.w3.org/2000/svg";
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+// 각도만 조금씩 밀어 사진끼리 GAP보다 가깝지 않게 한다
+function spread(pts, cx, cy) {
+  const pos = p => ({ x: cx + p.r * Math.cos(p.a), y: cy - p.r * Math.sin(p.a) });
+  for (let n = 0; n < 60; n++) {
+    let moved = false;
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+      const A = pos(pts[i]), B = pos(pts[j]);
+      if (Math.hypot(A.x - B.x, A.y - B.y) >= GAP) continue;
+      const push = 0.06 * Math.sign(Math.sin(pts[i].a - pts[j].a) || 1);
+      pts[i].a += push; pts[j].a -= push;
+      moved = true;
+    }
+    if (!moved) break;
+  }
+  return pts.map(p => ({ ...p, ...pos(p) }));
+}
 
 // embP는 { ok, value: embeddingRank 결과, ms } 로 끝나는 약속
 export async function stageEmbed(embP, startedAt, passed) {
   measure();
   const t0 = performance.now();
   const passedIds = new Set(passed.map(p => p.id));
-  const shown = passed.slice(0, ROW_MAX);
+  const cx = W / 2, cy = G_H / 2, R = Math.min(W / 2, G_H / 2) - G_PAD;
 
   // 빠진 사람은 아래로 떨어지며 사라지고, 칸도 접힌다
   S.people.filter(p => !passedIds.has(p.id)).forEach((p, i) => {
@@ -219,34 +243,30 @@ export async function stageEmbed(embP, startedAt, passed) {
     d.to({ y: d.v.y.to + 40, o: 0, s: 10 / D0 }, SPR.soft, i * 12);
   });
   S.bins.to({ o: 0, y: 320 }, SPR.pop);
-  setHeight(ROW_TOP + shown.length * ROW_H + 40);
+  setHeight(G_H + 84);
 
-  // 맨 위: 나와 내 글. 이 글과 각 사람의 글을 숫자로 바꿔 비교한다
-  S.meDisc.to({ x: PH_X, y: 30, s: 36 / D0 }, SPR.move);
-  const head = mk("st-mine", `<b>내 관심사·소개 글</b><p>${esc(S.me.interests.join(", "))}</p>`);
-  S.body.append(head);
-  S.mine = new Node(head, { y: 12, o: 0 }).to({ y: 10, o: 1 }, SPR.soft, 120);
+  // 눈금 판: 기다리는 동안은 바깥 원 하나만
+  const svg = svgEl("svg", { class: "st-map", viewBox: `0 0 ${W} ${G_H}`, style: `width:${W}px;height:${G_H}px` });
+  svg.append(svgEl("circle", { cx, cy, r: R, class: "st-ring" }));
+  S.body.prepend(svg);
+  S.map = new Node(svg, { o: 0 }).to({ o: 1 }, SPR.soft, 150);
 
-  // 사람마다 한 줄. 사진(원판)은 줄 왼쪽에 앉는다
-  const list = mk("st-list", `<div class="st-axis"><span>덜 비슷</span><span>비슷</span></div>`);
-  S.body.append(list);
-  S.list = new Node(list, { o: 0 }).to({ o: 1 }, SPR.soft, 160);
-  const rows = new Map();
-  shown.forEach((p, i) => {
-    const el = mk("st-row", `<b>${esc(p.name)}</b><span class="st-track wait"><i></i></span><em>–</em>`);
-    list.append(el);
-    rows.set(p.id, { el, node: new Node(el, { y: rowY(i) - ROW_H / 2, o: 0 }).to({ o: 1 }, SPR.soft, 250 + i * 30) });
-    S.discs.get(p.id).to({ x: PH_X, y: rowY(i), s: PH / D0, o: 1 }, SPR.move, 150 + i * 30);
+  // 나는 가운데, 다른 사람은 바깥 원 위에 고르게 앉아 차례로 짚인다
+  S.meDisc.to({ x: cx, y: cy, s: 40 / D0 }, SPR.move);
+  passed.forEach((p, i) => {
+    const a = Math.PI / 2 - (i / passed.length) * Math.PI * 2;
+    S.discs.get(p.id).to({ x: cx + R * Math.cos(a), y: cy - R * Math.sin(a), s: 28 / D0, o: 1 }, SPR.move, 150 + i * 30);
   });
-  passed.slice(ROW_MAX).forEach(p => S.discs.get(p.id).to({ o: 0 }, SPR.soft));
-  const foot = mk("st-foot", passed.length > ROW_MAX ? `외 ${passed.length - ROW_MAX}명도 같이 비교해요` : "");
+  const foot = mk("st-foot", "");
   S.body.append(foot);
-  S.foot = new Node(foot, { y: ROW_TOP + shown.length * ROW_H + 10, o: 1 });
+  S.foot = new Node(foot, { y: G_H + 4, o: 1 });
 
   const stopClock = startClock(startedAt);
   const stopBeat = every(BEAT, n => {
-    rows.forEach(({ el }, id) => el.classList.toggle("look", id === shown[n % shown.length].id));
-    msg("글을 숫자로 바꿔 나와 얼마나 비슷한지 재는 중");
+    const d = S.discs.get(passed[n % passed.length].id);
+    d.to({ s: 36 / D0 }, SPR.pop);
+    setTimeout(() => d.to({ s: 28 / D0 }, SPR.move), REDUCE ? 0 : 200);
+    msg(`${passed.length + 1}명의 관심사·소개 글을 숫자로 바꾸는 중`);
   });
 
   const r = await embP;
@@ -254,37 +274,52 @@ export async function stageEmbed(embP, startedAt, passed) {
   stopClock(r.ms);
   const emb = r.value;
   const top = emb.ranked.slice(0, 5);
-  const rank = new Map(emb.ranked.map((c, i) => [c.profile.id, { c, i }]));
 
-  // 막대가 실제 값까지 자란다 (가로 끝 = 1.0, 완전히 같은 글)
-  rows.forEach(({ el }, id) => {
-    const { c } = rank.get(id);
-    el.classList.remove("look");
-    el.querySelector(".st-track").classList.remove("wait");
-    el.querySelector(".st-track i").style.width = `${(Math.max(0, c.embed) * 100).toFixed(1)}%`;
-    new Num(el.querySelector("em"), 0, v => v.toFixed(3)).val.set(c.embed, SPR.soft);
+  // 눈금: 0.1 간격 동심원. 가장 먼 사람이 들어가도록
+  const dmax = Math.max(0.2, Math.ceil(Math.max(...emb.ranked.map(c => 1 - c.embed)) * 10) / 10);
+  const rOf = cos => NEAR + ((1 - cos) / dmax) * (R - NEAR);
+  svg.innerHTML = "";
+  for (let d = 0.1; d <= dmax + 1e-9; d += 0.1) {
+    const rr = rOf(1 - d);
+    svg.append(svgEl("circle", { cx, cy, r: rr, class: "st-ring" }));
+    const t = svgEl("text", { x: cx + 3, y: cy - rr - 3, class: "st-ringv" });
+    t.textContent = (1 - d).toFixed(1);
+    svg.append(t);
+  }
+
+  // 방향: 내 좌표에서 그 사람 좌표로 (PCA 1·2축). 뜻 묶음으로 대신했으면 방향 정보가 없어 고르게 놓는다
+  const me2 = emb.me?.xyz;
+  const pts = spread(emb.ranked.map((c, i) => ({
+    c, r: rOf(c.embed),
+    a: me2 && c.xyz ? Math.atan2(c.xyz[1] - me2[1], c.xyz[0] - me2[0]) : Math.PI / 2 - (i / emb.ranked.length) * Math.PI * 2,
+  })), cx, cy);
+
+  pts.forEach(({ c, x, y }, i) => {
+    const isTop = i < top.length;
+    const line = svgEl("line", { x1: cx, y1: cy, x2: x, y2: y, class: `st-ray${isTop ? " top" : ""}` });
+    svg.insertBefore(line, svg.firstChild);
+    S.discs.get(c.profile.id).to({ x, y, s: (isTop ? 32 : 24) / D0, o: isTop ? 1 : 0.5 }, SPR.move, i * 50);
   });
   foot.textContent = emb.fallback
-    ? "임베딩 서버에 연결하지 못해 관심사 뜻 묶음 점수로 대신 계산했어요"
-    : `${emb.model} 임베딩 · ${secs(r.ms)}초 · 1에 가까울수록 비슷해요`;
+    ? "임베딩 서버에 연결하지 못해 관심사 뜻 묶음 점수로 거리를 정했어요"
+    : `가운데가 나 · 가까울수록 글이 비슷해요 · ${emb.model} ${secs(r.ms)}초`;
   foot.classList.toggle("fail", !!emb.fallback);
-  msg(emb.fallback ? "관심사 뜻 묶음 점수로 비교했어요" : "비슷한 순서로 다시 줄 세워요");
+  msg(emb.fallback ? "관심사 뜻 묶음 점수로 거리를 정했어요" : "비슷한 사람일수록 나에게 가까이 와요");
   await sleep(REDUCE ? 0 : 700);
 
-  // 비슷한 순서로 다시 선다. 상위 5명만 색이 남는다
-  const order = shown.map(p => rank.get(p.id)).sort((a, b) => a.i - b.i);
-  order.forEach(({ c }, i) => {
-    const row = rows.get(c.profile.id);
-    const isTop = top.includes(c);
-    row.node.to({ y: rowY(i) - ROW_H / 2, o: isTop ? 1 : 0.45 }, SPR.move, i * 40);
-    row.el.classList.toggle("top", isTop);
-    row.el.querySelector("b").innerHTML = `${isTop ? `<span class="st-n">${top.indexOf(c) + 1}</span>` : ""}${esc(c.profile.name)}`;
-    S.discs.get(c.profile.id).to({ y: rowY(i), o: isTop ? 1 : 0.45 }, SPR.move, i * 40);
+  // 가장 가까운 5명: 지도에는 순위 번호만, 이름과 실제 값은 아래 범례에 (지도 위 글자는 서로 겹친다)
+  S.tags = pts.slice(0, top.length).map(({ x, y }, i) => {
+    const el = mk("st-n st-pin", `${i + 1}`);
+    S.body.append(el);
+    return new Node(el, { x: x + 9, y: y - 25, o: 0 }).to({ o: 1 }, SPR.pop, i * 120);
   });
-  msg(`가장 비슷한 ${top.length}명이 다음 단계로 가요`);
+  const legend = mk("st-legend", top.map((c, i) => `<span><i class="st-n">${i + 1}</i>${esc(c.profile.name)} <em>${c.embed.toFixed(3)}</em></span>`).join(""));
+  S.body.append(legend);
+  S.tags.push(new Node(legend, { y: G_H + 30, o: 0 }).to({ y: G_H + 26, o: 1 }, SPR.soft, 200));
+  msg(`가장 가까운 ${top.length}명이 다음 단계로 가요`);
   S.top = top;
   S.fallback = !!emb.fallback;
-  await sleep(REDUCE ? 0 : 900);
+  await sleep(REDUCE ? 0 : 1000);
   await until(t0 + MIN_STAGE_MS);
 }
 
@@ -294,7 +329,7 @@ export async function stageRerank(rrP, startedAt) {
   measure();
   const t0 = performance.now();
   const top = S.top;
-  [S.list, S.mine, S.foot].forEach(n => n.to({ o: 0 }, SPR.soft));
+  [S.map, S.foot, ...S.tags].forEach(n => n.to({ o: 0 }, SPR.soft));
   setHeight(CARD_TOP + top.length * CARD_STEP + 8);
   const topIds = new Set(top.map(c => c.profile.id));
   S.people.filter(p => !topIds.has(p.id)).forEach(p => S.discs.get(p.id).to({ o: 0 }, SPR.soft));

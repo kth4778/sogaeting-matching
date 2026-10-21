@@ -50,21 +50,18 @@
 .st-bin span { font-variant-numeric: tabular-nums; }
 .st-bin.on { color: var(--text-1); }
 .st-bin.on span { color: var(--text-brand); font-weight: var(--fw-bold); }
-/* 2단계: 한 사람 = 한 줄. 막대 끝 = 1.0(완전히 같은 글) */
-.st-mine { right: 0; padding: 0 var(--sp-3) 0 58px; }
-.st-mine b { display: block; font-size: 12px; line-height: 16px; color: var(--text-3); font-weight: var(--fw-semibold); }
-.st-mine p { font-size: 14px; line-height: 20px; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.st-list { right: 0; bottom: 0; }
-.st-axis { position: absolute; left: 116px; right: 64px; top: 50px; display: flex; justify-content: space-between; font-size: 10px; color: var(--text-3); }
-.st-row { position: absolute; left: 0; right: 0; top: 0; height: 38px; display: flex; align-items: center; gap: var(--sp-2); padding: 0 var(--sp-3) 0 52px; border-radius: var(--r-sm); transition: background-color var(--m-base) var(--e-out); }
-.st-row.look { background: var(--surface-sunken); }
-.st-row b { width: 56px; flex-shrink: 0; display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-1); white-space: nowrap; overflow: hidden; }
+/* 2단계: 2차원 지도. 가운데 = 나, 거리 = 1 − 코사인 */
+.st-map { overflow: visible; stroke-width: 1; }
+.st-ring { fill: none; stroke: rgba(29,29,31,.16); stroke-dasharray: 3 3; }
+.st-ringv { stroke: none; font-size: 10px; fill: var(--text-3); font-variant-numeric: tabular-nums; }
+.st-ray { stroke: rgba(29,29,31,.14); stroke-width: 1; }
+.st-ray.top { stroke: var(--pink-400); stroke-width: 1.5; }
+.st-pin { box-shadow: 0 0 0 2px var(--surface); }
+.st-legend { right: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 12px; padding: 0 var(--sp-3); font-size: 12px; color: var(--text-1); }
+.st-legend i { font-style: normal; }
+.st-legend span { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.st-legend em { font-style: normal; font-weight: var(--fw-semibold); color: var(--text-brand); font-variant-numeric: tabular-nums; }
 .st-n { flex-shrink: 0; width: 16px; height: 16px; display: grid; place-items: center; border-radius: var(--r-full); background: var(--pink-500); color: #fff; font-size: 10px; }
-.st-track { flex: 1; height: 8px; border-radius: var(--r-full); background: var(--surface-sunken); overflow: hidden; }
-.st-track i { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--gray-400); transition: width 900ms var(--e-out); }
-.st-row.top .st-track i { background: var(--pink-500); }
-.st-track.wait i { width: 100%; background: var(--gray-200); animation: home-bar-wait 1000ms var(--e-move) 9999 both; transition: none; }
-.st-row em { width: 44px; flex-shrink: 0; text-align: right; font-style: normal; font-size: 13px; font-weight: var(--fw-semibold); color: var(--text-1); font-variant-numeric: tabular-nums; }
 .st-foot { right: 0; padding: 0 var(--sp-3); font-size: 11px; line-height: 16px; color: var(--text-3); text-align: center; }
 .st-foot.fail { color: var(--danger); }
 
@@ -269,7 +266,7 @@
   .home-ring, .home-sat i { animation: none; }
   .reveal .win-badge, .reveal .win-name, .reveal .win-sub, .reveal .win-score, .reveal .two-btn, .reveal .report, .reveal .home-sec, .reveal .rank-row, .st-msg.st-new { animation: home-fade 200ms linear both; }
   .mp-seg.run i { animation: none; transform: scaleX(1); opacity: .5; }
-  .st-track.wait i, .st-dot { animation: none; }
+  .st-dot { animation: none; }
   .win-fx { display: none; }
 }
 @keyframes home-fade { from { opacity: 0; } to { opacity: 1; } }
