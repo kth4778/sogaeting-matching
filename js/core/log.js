@@ -1,6 +1,5 @@
 // 매칭 과정 로그 카드의 내용 (로그 카드 안 문자열은 이 파일과 matching.js에서만 만든다)
-import { $, esc, photo, sleep } from "./util.js";
-import { STAGE_MS } from "../config.js";
+import { $, esc, photo } from "./util.js";
 import { registerReset } from "./store.js";
 import { PROFILES } from "../data/profiles.js";
 import { icon } from "../ui/icons.js";
@@ -16,8 +15,6 @@ export const logEl = Object.assign(document.createElement("div"), { className: "
 logEl.setAttribute("aria-live", "polite");
 // 진행 헤더(진행 막대·단계 문구·인원 카운터) — 매칭 탭 앱바 아래 sticky
 export const pipelineEl = Object.assign(document.createElement("div"), { className: "match-progress" });
-// 후보 20명 아바타 격자
-export const gridEl = Object.assign(document.createElement("div"), { className: "match-grid" });
 
 // ---------- 따라가기 스크롤 (§4.5) ----------
 let follow = true;
@@ -63,7 +60,7 @@ export function startFollow(screen) {
 }
 export function stopFollow() { unfollow?.(); unfollow = null; }
 
-// 매칭을 누른 직후 1번: 아바타 격자·로그 블록 위끝을 진행 헤더 바로 아래로
+// 매칭을 누른 직후 1번: 무대 위끝을 진행 헤더 바로 아래로
 export function showLogCard() {
   const screen = $("#screen");
   const stage = document.querySelector(".match-stage");
@@ -125,13 +122,6 @@ export const PIPE = [
   ["궁합 점수", "궁합 점수를 매기는 중"],
   ["추천 이유", "가장 잘 맞는 분을 소개할게요"],
 ];
-// 단계별 예상 시간(진행 막대 채움) = 그 단계 대기 상수의 합
-const PIPE_MS = [
-  STAGE_MS.s1Intro + STAGE_MS.s1Out,
-  STAGE_MS.s2Intro + STAGE_MS.s2Embed + STAGE_MS.s2Out,
-  STAGE_MS.s3Api + STAGE_MS.s3Board + STAGE_MS.s3Settle,
-  STAGE_MS.s4Api,
-];
 export const pipe = { status: ["wait", "wait", "wait", "wait"], note: ["", "", "", ""], counts: [PROFILES.length] };
 
 export function renderPipeline() {
@@ -160,11 +150,8 @@ export function setPipe(i, status, note) {
   if (note !== undefined) pipe.note[i] = note;
   if (!pipelineEl.firstElementChild) renderPipeline();
   const seg = pipelineEl.querySelectorAll(".mp-seg")[i];
-  if (seg) {
-    void seg.offsetWidth; // 막 그려진 칸도 0에서부터 채워지도록
-    seg.className = `mp-seg ${status}`;
-    seg.style.setProperty("--fill-ms", `${status === "run" ? PIPE_MS[i] : DUR.base}ms`);
-  }
+  // 진행 중인 칸은 걸릴 시간을 모르므로 빛이 흐르기만 하고, 끝나면 채운다
+  if (seg) seg.className = `mp-seg ${status}`;
   if (status === "run") rollText(PIPE[i][1]);
 }
 export function setCount(n) {
@@ -177,22 +164,6 @@ export function resetPipe() {
   pipe.note = ["", "", "", ""];
   pipe.counts = [PROFILES.length];
   renderPipeline();
-  renderGrid();
-}
-
-// ---------- 아바타 격자 ----------
-export function renderGrid() {
-  gridEl.innerHTML = PROFILES.map(p => `<span class="mg-av" data-id="${p.id}" style="background-image:url(${photo(p)})"></span>`).join("");
-}
-// 빠지는 사람을 30ms 간격으로 흐리게
-const DIM_STAGGER_MS = 30;
-export function dimAvatars(ids) {
-  ids.forEach((id, i) => {
-    const el = gridEl.querySelector(`[data-id="${id}"]`);
-    if (!el) return;
-    el.style.transitionDelay = `${REDUCE ? 0 : i * DIM_STAGGER_MS}ms`;
-    el.classList.add("out");
-  });
 }
 
 // ---------- 단계 상자 ----------
@@ -207,16 +178,16 @@ export function logStage(n, title, what, why) {
 }
 
 // 기다리는 동안 초가 올라가는 줄. 끝나면 결과 문장으로 바뀐다.
+// t0: 실제 요청을 보낸 때, done의 ms: 실제로 걸린 시간 (그림이 늦게 따라와도 실제 값을 적는다)
 const TICK_MS = 100;
-export function logWorking(text) {
+export function logWorking(text, t0 = performance.now()) {
   const row = logSub("", "working");
-  const t0 = performance.now();
-  const secs = () => ((performance.now() - t0) / 1000).toFixed(1);
+  const secs = ms => ((ms ?? performance.now() - t0) / 1000).toFixed(1);
   const tick = () => { row.innerHTML = `<span class="spin"></span>${esc(text)} <b>${secs()}초</b>`; };
   tick();
   const timer = setInterval(tick, TICK_MS);
   return {
-    done(msg) { clearInterval(timer); row.className = "sub dim"; row.innerHTML = `${icon("check", 14)} ${esc(msg)} (${secs()}초)`; },
+    done(msg, ms) { clearInterval(timer); row.className = "sub dim"; row.innerHTML = `${icon("check", 14)} ${esc(msg)} (${secs(ms)}초)`; },
     fail(msg) { clearInterval(timer); row.className = "sub err"; row.innerHTML = `${icon("x", 14)} ${esc(msg)}`; },
   };
 }
@@ -224,7 +195,7 @@ export function logWorking(text) {
 // 재순위 전후를 같은 판에서 보여 준다: 취향 순서로 놓았다가 궁합 점수 순서로 줄이 움직여 자리를 바꾼다
 export const ROW_H = 38;
 const ROW_STAGGER_MS = 60;
-export async function logRankBoard(before, after) {
+export function logRankBoard(before, after) {
   const board = document.createElement("div");
   board.className = "rank-board";
   board.style.height = `${before.length * ROW_H + 40}px`;
@@ -238,7 +209,7 @@ export async function logRankBoard(before, after) {
         <span class="rb-score">${Math.round(c.embed * 100)}</span>
       </div>`).join("");
   add(board);
-  await sleep(STAGE_MS.s3Board);
+  void board.offsetWidth; // 놓인 자리에서부터 움직이도록
   after.forEach((c, i) => {
     const row = board.querySelector(`[data-id="${c.profile.id}"]`);
     const from = before.findIndex(b => b.profile.id === c.profile.id);
@@ -253,7 +224,6 @@ export async function logRankBoard(before, after) {
   });
   board.querySelector(".rb-title").textContent = "궁합 점수 순위";
   board.querySelector(".rb-state").textContent = "순위 확정";
-  await sleep(STAGE_MS.s3Settle);
 }
 
 // 숫자를 시작값에서 목표값까지 올라가며 보여 준다 (easeOutExpo)
@@ -270,4 +240,3 @@ export function countUp(el, to, unit, from = 0) {
 
 // 「데모 초기화」 때 로그와 진행 헤더를 비운다
 registerReset(() => { bootLog(); resetPipe(); });
-renderGrid();

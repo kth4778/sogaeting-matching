@@ -2,7 +2,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { -webkit-text-size-adjust: 100%; word-break: keep-all; overflow-wrap: anywhere; line-break: strict; }
 body { font-family: var(--font); letter-spacing: var(--ls-body); color: var(--text-1); height: 100vh; overflow: hidden; background: var(--bg-desktop); -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; }
-h1, h2, h3, .hm-quote { text-wrap: balance; }
+h1, h2, h3, .rp-headline { text-wrap: balance; }
 p, .bubble, .reason { text-wrap: pretty; }
 button { font: inherit; letter-spacing: inherit; color: inherit; background: none; border: 0; cursor: pointer; touch-action: manipulation; }
 input { font: inherit; }
