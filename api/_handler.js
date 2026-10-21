@@ -1,7 +1,7 @@
 // Vercel 서버 함수 공통 처리. API 키는 Vercel 환경 변수에만 있고 브라우저로 내려가지 않는다.
 // (_로 시작하는 파일은 Vercel이 주소로 만들지 않는다)
 import Anthropic from "@anthropic-ai/sdk";
-import { MODEL, ROUTES, toErrorMessage } from "../llm.js";
+import { MODEL, ROUTES, claudeRunner, toErrorMessage } from "../llm.js";
 
 const MAX_BODY_BYTES = 20_000;   // 프로필 6명 + 대화 기록이면 충분한 크기
 const MAX_CHAT_TURNS = 30;       // 채팅 기록이 길어져 비용이 커지는 것을 막는다
@@ -44,7 +44,7 @@ export function handle(path) {
 
     const started = Date.now();
     try {
-      const result = await ROUTES[path](new Anthropic(), body);
+      const result = await ROUTES[path](claudeRunner(new Anthropic()), body); // 배포판은 늘 Claude
       res.status(200).json({ ...result, model: MODEL, ms: Date.now() - started });
     } catch (err) {
       const [status, message] = toErrorMessage(err);

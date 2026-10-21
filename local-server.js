@@ -1,12 +1,16 @@
-// 로컬 실행용 서버: 정적 파일 제공 + Claude 호출 3개(llm.js).
+// 로컬 실행용 서버: 정적 파일 제공 + LLM 단계 3개(llm.js) + 임베딩(local-llm/).
 // 규칙 거르기는 브라우저, 임베딩은 로컬 LLM(Ollama), 재순위·이유·채팅은 Claude가 맡는다.
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
-import { MODEL, ROUTES, toErrorMessage } from "./llm.js";
+import { ROUTES, claudeRunner, toErrorMessage } from "./llm.js";
 import { embedRank } from "./local-llm/embed-rank.js";
+import { ollamaRunner } from "./local-llm/ollama.js";
+
+// 재순위·이유·채팅을 누가 할지: claude(기본) 또는 ollama(.env에 LLM_PROVIDER=ollama)
+const PROVIDER = process.env.LLM_PROVIDER === "ollama" ? "ollama" : "claude";
 
 const PORT = 3000;
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "public");
@@ -50,8 +54,9 @@ http.createServer(async (req, res) => {
   if (handler && req.method === "POST") {
     const started = Date.now();
     try {
-      const result = await handler(claude(), await readJson(req));
-      send(res, 200, { ...result, model: MODEL, ms: Date.now() - started });
+      const run = PROVIDER === "ollama" ? ollamaRunner() : claudeRunner(claude());
+      const result = await handler(run, await readJson(req));
+      send(res, 200, { ...result, model: run.model, ms: Date.now() - started });
     } catch (err) {
       const [status, message] = err instanceof MissingKeyError
         ? [503, ".env에 ANTHROPIC_API_KEY가 비어 있습니다. 키를 넣고 서버를 다시 켜세요."]
@@ -72,6 +77,6 @@ http.createServer(async (req, res) => {
     send(res, 404, { error: "not found" });
   }
 }).listen(PORT, () => {
-  console.log(`http://localhost:${PORT}`);
-  if (!process.env.ANTHROPIC_API_KEY) console.log("경고: ANTHROPIC_API_KEY가 없습니다. LLM 단계는 실패로 표시됩니다.");
+  console.log(`http://localhost:${PORT} · LLM: ${PROVIDER}`);
+  if (PROVIDER === "claude" && !process.env.ANTHROPIC_API_KEY) console.log("경고: ANTHROPIC_API_KEY가 없습니다. LLM 단계는 실패로 표시됩니다.");
 });

@@ -11,7 +11,7 @@
 | 3. LLM 재순위 | Claude가 5명의 글을 읽고 성격·대화 스타일까지 보고 다시 줄 세운다 | 서버 → Claude API |
 | 4. LLM 이유 설명 | 5명 각각을 고른 이유를 두 프로필에 적힌 내용만으로 쓴다 (1위는 결과 화면, 2~5위는 상세 화면) | 서버 → Claude API |
 
-임베딩은 이 컴퓨터의 Ollama가 한다(`local-llm/`). 배포판처럼 Ollama가 없으면 관심사 뜻 묶음 계산으로 대신하고 로그에 그렇게 적는다. 재순위·이유·채팅도 나중에 `local-llm/`로 옮길 수 있게 나눠 두었다.
+임베딩은 이 컴퓨터의 Ollama가 한다(`local-llm/`). 배포판처럼 Ollama가 없으면 관심사 뜻 묶음 계산으로 대신하고 로그에 그렇게 적는다. 재순위·이유·채팅은 기본으로 Claude가 하고, `.env`에 `LLM_PROVIDER=ollama`를 넣으면 로컬 모델(`qwen3.6:27b`, 바꾸려면 `OLLAMA_CHAT_MODEL`)이 같은 질문지로 답한다. 질문지는 `llm.js` 하나이고, 묻는 쪽만 `claudeRunner`(llm.js) / `ollamaRunner`(local-llm/ollama.js)로 갈린다. Vercel 배포판은 늘 Claude를 쓴다.
 
 ## 폰에서 앱처럼 쓰기
 

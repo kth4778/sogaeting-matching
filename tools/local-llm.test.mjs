@@ -32,3 +32,28 @@ test("embedRank: 나와 가까운 사람이 먼저, 같은 문장은 다시 계�
   await embedRank({ me, people }, fakeEmbed);
   assert.equal(calls.length, 0);
 });
+
+// ---------- LLM 연결 갈아끼우기 ----------
+import { ROUTES } from "../llm.js";
+import { ollamaRunner } from "../local-llm/ollama.js";
+
+const person = id => ({ id, name: id, gender: "여", age: 24, region: "충주", job: "학생", smoking: "비흡연", drinking: "가끔", religion: "무교", mbti: "INFP", interests: ["등산"], intro: "산", personality: "조용" });
+
+test("재순위는 어떤 LLM 연결이든 같은 질문지(스키마)를 넘긴다", async () => {
+  let asked;
+  const fakeRun = async req => { asked = req; return { output: { ranking: [{ id: "a", score: 80, oneLine: "잘 맞아요" }] }, usage: null }; };
+  const res = await ROUTES["/api/rerank"](fakeRun, { me: person("me"), candidates: [{ profile: person("a"), embed: 0.8 }] });
+  assert.equal(res.ranking[0].id, "a");
+  assert.ok(asked.system && asked.messages.length && asked.schema);
+});
+
+test("ollamaRunner: Ollama JSON 답을 스키마로 검사해 돌려준다", async () => {
+  const fakeFetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    assert.equal(body.think, false);
+    assert.ok(body.format.properties.ranking);
+    return { ok: true, json: async () => ({ message: { content: JSON.stringify({ ranking: [{ id: "a", score: 70, oneLine: "좋아요" }] }) } }) };
+  };
+  const res = await ROUTES["/api/rerank"](ollamaRunner("qwen-test", fakeFetch), { me: person("me"), candidates: [{ profile: person("a"), embed: 0.8 }] });
+  assert.equal(res.ranking[0].score, 70);
+});
