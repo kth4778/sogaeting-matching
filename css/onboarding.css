@@ -108,24 +108,22 @@
 .sample-info small { display: block; font-size: 12px; color: var(--text-2); margin: 3px 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sample-info .chip { font-size: 11px; padding: 4px 9px; margin: 0 3px 4px 0; }
 .chev { font-size: 24px; color: var(--gray-300); }
-.hero { position: relative; flex: 1; min-height: 300px; display: grid; place-items: center; overflow: hidden; border-radius: 30px; margin-top: 6px; background: radial-gradient(260px 220px at 50% 45%, #ffe1e7, #fff4f6 60%, #fff 100%); box-shadow: var(--card-shadow); }
-.orbit { position: absolute; left: 50%; width: 0; height: 0; animation: spin 46s linear infinite; top: 42%; }
-.orbit-out { animation-duration: 70s; animation-direction: reverse; }
-.orb { position: absolute; left: 0; top: 0; transform: rotate(var(--a)) translateY(var(--r)) rotate(calc(-1 * var(--a))); }
-.orbit-in .orb { --r: -92px; }
-.orbit-out .orb { --r: -148px; }
-.orb i { display: block; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: #eee center/cover; border: 3px solid rgba(255,255,255,.9); box-shadow: 0 6px 16px rgba(40, 20, 30, .18); animation: counter 46s linear infinite, bob 4s ease-in-out infinite; }
-.orbit-out .orb i { width: 38px; height: 38px; margin: -19px 0 0 -19px; opacity: .85; animation: counter-rev 70s linear infinite, bob 5s ease-in-out infinite; }
-.orb:nth-child(odd) i { animation-delay: 0s, -2s; }
-.hero-core { position: absolute; left: 50%; transform: translate(-50%, -50%); top: 42%; }
-.hero-core img { width: 84px; height: 84px; border-radius: 24%; box-shadow: 0 14px 34px rgba(232, 84, 107, .35); animation: breathe 3.2s ease-in-out infinite; }
-.hero-heart { position: absolute; right: -10px; top: -10px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; color: #fff; background: linear-gradient(180deg, #f06d84, #e2486a); box-shadow: 0 6px 14px rgba(232, 84, 107, .45); animation: beat 1.6s ease-in-out infinite; }
-.hero-pair { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; bottom: 58px; }
-.hero-pair i { width: 54px; height: 54px; border-radius: 50%; background: #eee center/cover; border: 3px solid #fff; box-shadow: 0 8px 18px rgba(40, 20, 30, .2); animation: pairL 6s ease-in-out infinite; }
-.hero-pair i:last-child { animation-name: pairR; }
-.hero-pair svg { width: 92px; height: 30px; margin: 0 -6px; overflow: visible; }
-.hero-pair path { fill: none; stroke: #e8546b; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 140; stroke-dashoffset: 140; animation: draw 6s ease-in-out infinite; filter: drop-shadow(0 0 4px rgba(232, 84, 107, .6)); }
-.hero-title { position: absolute; left: 0; right: 0; text-align: center; color: var(--text-brand); font-size: 30px; bottom: 12px; }
+/* 웰컴 히어로: ui/brand.js가 매 프레임 transform·clip-path를 정한다. 여기서는 처음 모양과 크기만 (크기 단위는 히어로 상자 기준 cqw·cqh) */
+.hero { position: relative; flex: 1; min-height: 300px; overflow: hidden; border-radius: 30px; margin-top: 6px; background: var(--surface-brand); box-shadow: var(--card-shadow); container-type: size; --u: min(1cqw, .78cqh); }
+.film-hero > * { position: absolute; }
+.fh-mark { left: 50%; top: 44%; width: 46cqw; height: 46cqw; z-index: 3; visibility: hidden; }
+.fh-mark svg { width: 100%; height: 100%; overflow: visible; }
+.fh-word { left: 20cqw; top: calc(9% - 3.4cqw); font-size: 5.6cqw; font-weight: 800; letter-spacing: -.04em; color: var(--text-1); z-index: 3; }
+.fh-flood { inset: 0; background: var(--pink-500); z-index: 5; visibility: hidden; }
+.fh-k { position: absolute; left: 8cqw; font-size: 15cqw; font-weight: 900; letter-spacing: -.06em; color: #fff; }
+.fh-k:nth-child(1) { top: 18%; } .fh-k:nth-child(2) { top: 36%; } .fh-k:nth-child(3) { top: 54%; }
+.fh-card { left: 0; top: 0; width: calc(var(--u) * 42); height: calc(var(--u) * 56); border-radius: calc(var(--u) * 5); overflow: hidden; background: var(--gray-100); z-index: 6; visibility: hidden; box-shadow: 0 calc(var(--u) * 3) calc(var(--u) * 8) rgba(40, 10, 20, .22); will-change: transform; }
+.fh-card i { position: absolute; inset: 0; background-size: cover; background-position: center 28%; }
+.fh-card b { position: absolute; left: 0; right: 0; bottom: 0; padding: calc(var(--u) * 11) calc(var(--u) * 3.6) calc(var(--u) * 3.6); color: var(--text-on-photo); font-size: calc(var(--u) * 4.8); font-weight: 800; letter-spacing: -.03em; background: var(--scrim-card); }
+.fh-card b small { font-size: calc(var(--u) * 3.6); font-weight: 500; opacity: .85; }
+.fh-like { position: absolute; right: calc(var(--u) * 2.5); bottom: calc(var(--u) * 2.5); width: calc(var(--u) * 9); height: calc(var(--u) * 9); border-radius: 50%; background: #fff; color: var(--pink-500); display: grid; place-items: center; }
+.fh-like svg { width: calc(var(--u) * 4.8); height: calc(var(--u) * 4.8); fill: currentColor; }
+.fh-like.on { background: var(--pink-500); color: #fff; }
 .story { margin: 14px 0 6px; overflow: hidden; }
 .story-track { display: flex; animation: storySlide 12s infinite; }
 .story-card { flex: 0 0 100%; display: flex; align-items: center; gap: 12px; padding: 4px 2px; }

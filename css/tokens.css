@@ -87,7 +87,6 @@
 
   /* ---- 글꼴 ---- */
   --font: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-pen: "Nanum Pen Script", cursive;    /* 워드마크 「오늘, 누구와?」 전용 */
   /* 크기/줄높이/굵기/자간 — 9단계 + 배지 */
   --fs-badge: 11px;    --lh-badge: 14px;    /* 숫자 배지·「AI」 라벨만 */
   --fs-caption: 12px;  --lh-caption: 16px;
