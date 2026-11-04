@@ -1,4 +1,5 @@
-/* motion.css — 여러 화면이 같이 쓰는 @keyframes·오버레이 진입·reduced-motion·.paused (화면 전용 keyframes는 각 화면 파일) */
+/* motion.css — 여러 화면이 같이 쓰는 @keyframes prDot { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-5px); opacity: 1; } }
+@keyframes·오버레이 진입·reduced-motion·.paused (화면 전용 keyframes는 각 화면 파일) */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes fadeOut { to { opacity: 0; } }
