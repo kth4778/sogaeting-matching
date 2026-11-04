@@ -7,6 +7,7 @@ import "./screens/cards.js";
 import "./screens/detail.js";
 import "./screens/chat.js";
 import "./screens/practice.js";
+import "./features/present.js";
 import "./screens/profile.js";
 import { $ } from "./core/util.js";
 import { state } from "./core/store.js";
@@ -126,7 +127,9 @@ registerActions({
 const MOBILE = window.matchMedia(MOBILE_Q);
 function fitPhone() {
   // 모바일에서는 가상 아이폰 없이 화면 전체를 쓰므로 크기를 맞추지 않는다
-  const s = MOBILE.matches ? 1 : Math.min(1.0, (window.innerHeight - 32) / 874);
+  // 발표 모드는 폰 두 대(402 × 2 + 간격 72)가 가로에도 들어와야 한다
+  const wide = document.body.classList.contains("present") ? (window.innerWidth - 40) / 876 : 1;
+  const s = MOBILE.matches ? 1 : Math.min(1.0, (window.innerHeight - 32) / 874, wide);
   document.documentElement.style.setProperty("--s", s.toFixed(3));
 }
 window.addEventListener("resize", fitPhone);
