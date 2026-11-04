@@ -1,10 +1,10 @@
-// 연애 연습 탭: 위아래로 넘기며 상황을 고르고 → 상대에게 최대 10번 답하고(S·F면 바로 끝) → 연애 대화 보고서
-// 피드는 탭 화면, 대화·보고서는 탭바를 가리는 오버레이다. 오버레이는 game 값만으로 다시 그릴 수 있다.
+// 연애 연습 탭: 탐색(검색·오늘의 도전·주제·목록) → 대화 전 안내(할 일·상황·미션) → 대화(턴·기분·미션, 최대 10번) → 연애 대화 보고서
+// 탐색은 탭 화면, 나머지는 탭바를 가리는 오버레이다. 오버레이는 game 값만으로 다시 그릴 수 있다.
 import { esc } from "../core/util.js";
 import { state, registerReset } from "../core/store.js";
 import { registerScreen, registerOverlay, registerActions, render, pushRoute, backRoute } from "../core/runtime.js";
 import { api } from "../core/matching.js";
-import { MAX_ANSWERS, slidesFor, outcomeOf } from "../core/practice.js";
+import { MAX_ANSWERS, slidesFor, outcomeOf, moodLabel } from "../core/practice.js";
 import { MOODS } from "../data/practice.js";
 import { icon } from "../ui/icons.js";
 import { toast } from "../ui/toast.js";
@@ -12,79 +12,138 @@ import { openSheet } from "../ui/sheet.js";
 import { canSpeak, isMuted, setMuted, speak, stopSpeech, unlockSpeech } from "../ui/speech.js";
 
 const OUTCOME = {
-  clear: ["마음이 풀렸어요", "대화 하나로 마음을 돌렸어요"],
+  clear: ["마음이 풀렸어요", "대화로 마음을 돌렸어요"],
   fail: ["대화가 끊겼어요", "상대가 더 이야기하고 싶지 않대요"],
   limit: ["기회를 다 썼어요", "여기까지의 대화를 정리했어요"],
 };
+const MOOD_NAME = { calm: "평온", happy: "기쁨", hurt: "서운함", angry: "화남", moved: "감동" };
 const face = (c, mood) => `photos/practice/${c.id}-${mood}.jpg`;
 
-let game = null;       // { situation, character, turns, mood, grade, suggestions, sending, outcome, report, reportError, draft }
-let feedTop = 0;       // 다른 탭에 다녀와도 보던 상황에서 이어 간다
+let game = null;       // { situation, character, view, turns, mood, score, done, grade, suggestions, showTips, sending, outcome, report, reportError, draft }
+let topic = "전체";
+let query = "";
 
 const answers = () => game.turns.filter(t => t.from === "me").length;
 const lastLine = () => game.turns.findLast(t => t.from === "them").text;
 const lastAnswer = () => game.turns.findLast(t => t.from === "me")?.text;
+const slides = () => slidesFor(state.me.gender);
+// 오늘의 도전은 날짜로 정한다: 하루 동안 같은 상황이 나온다
+const todayIndex = () => Math.floor(Date.now() / 86_400_000) % slides().length;
 
-// ---------- 피드 ----------
-function slideHtml({ situation: s, character: c }, i) {
+// ---------- 탐색 ----------
+function rowHtml({ situation: s, character: c }, n) {
   return `
-    <section class="pr-slide">
-      <div class="pr-photo" style="background-image:url(${face(c, s.mood)})"></div>
-      ${i === 0 ? `<span class="pr-hint">${icon("chevron-up", 14)}위로 넘기면 다른 상황</span>` : ""}
-      <div class="pr-info">
-        <span class="pr-topic">${esc(s.topic)}</span>
-        <h2>${esc(s.title)}</h2>
-        <p class="pr-scene">${esc(s.scene)}</p>
-        <p class="pr-opening"><b>${esc(c.name)} · ${c.age}</b>${esc(s.opening)}</p>
-        <button class="btn pr-start" data-act="practice-start:${i}">이 상황 연습하기</button>
-      </div>
-    </section>`;
+    <button class="pr-row" data-act="practice-open:${s.id}">
+      <span class="pr-rank">${n}</span>
+      <i class="pr-thumb" style="background-image:url(${face(c, s.mood)})"></i>
+      <span class="pr-rowtext"><b>${esc(s.title)}</b><small>${esc(s.topic)} · ${esc(c.name)}, ${c.age}</small></span>
+    </button>`;
+}
+
+function listHtml() {
+  const q = query.trim();
+  const list = slides().filter(({ situation: s, character: c }) => (topic === "전체" || s.topic === topic)
+    && (!q || `${s.title} ${s.scene} ${s.topic} ${c.name}`.includes(q)));
+  return list.length ? list.map((x, i) => rowHtml(x, i + 1)).join("") : `<p class="pr-empty">찾는 상황이 없어요</p>`;
+}
+
+function exploreHtml() {
+  const today = slides()[todayIndex()];
+  const topics = ["전체", ...new Set(slides().map(x => x.situation.topic))];
+  return `
+    <div class="pr-explore">
+      <h1 class="pr-title">연애 연습</h1>
+      <label class="pr-search"><span>${icon("search", 20)}</span><input class="pr-q" type="search" placeholder="상황 검색" aria-label="상황 검색" value="${esc(query)}"></label>
+      <button class="pr-today" data-act="practice-open:${today.situation.id}">
+        <span class="pr-todaytext">
+          <small><i></i>오늘의 도전</small>
+          <b>${esc(today.situation.title)}</b>
+          <span>상황 보기 ${icon("chevron-right", 16)}</span>
+        </span>
+        <i class="pr-todayface" style="background-image:url(${face(today.character, today.situation.mood)})"></i>
+      </button>
+      <div class="pr-topics" role="tablist">${topics.map(t => `<button role="tab" aria-selected="${t === topic}" class="${t === topic ? "on" : ""}" data-act="practice-topic:${esc(t)}">${esc(t)}</button>`).join("")}</div>
+      <h2 class="pr-h2">이런 상황, 어떻게 말할까요?</h2>
+      <div class="pr-list">${listHtml()}</div>
+    </div>`;
 }
 
 registerScreen("practice", {
-  html: () => `<div class="pr-feed">${slidesFor(state.me.gender).map(slideHtml).join("")}</div>`,
+  html: exploreHtml,
   mount(root) {
-    root.classList.add("no-scroll", "pr-screen");
-    const feed = root.querySelector(".pr-feed");
-    feed.scrollTop = feedTop;
-    feed.addEventListener("scroll", () => { feedTop = feed.scrollTop; }, { passive: true });
+    root.classList.add("pr-screen");
+    root.querySelector(".pr-q").addEventListener("input", e => {
+      query = e.target.value;
+      root.querySelector(".pr-list").innerHTML = listHtml();
+    });
   },
-  patch: () => true,   // 다른 화면 때문에 다시 그려도 피드 위치를 그대로 둔다
+  patch: () => true,   // 다른 화면 때문에 다시 그려도 입력과 스크롤을 그대로 둔다
 });
 
-// ---------- 대화 ----------
-function dotsHtml() {
-  const used = answers();
-  return `<span class="pr-dots" role="img" aria-label="기회 ${MAX_ANSWERS}번 중 ${used}번 사용">${Array.from({ length: MAX_ANSWERS }, (_, i) => `<i class="${i < used ? "on" : ""}"></i>`).join("")}</span>`;
+// ---------- 대화 전 안내 ----------
+function missionRows(done = []) {
+  return game.situation.missions.map((m, i) => `
+    <li class="${done.includes(i) ? "done" : ""}"><span class="pr-check">${done.includes(i) ? icon("check", 14) : ""}</span>${esc(m.text)}${m.required ? " <em>필수</em>" : ""}</li>`).join("");
 }
 
+function briefHtml() {
+  const { situation: s, character: c } = game;
+  const row = (ic, label, text) => `<div class="pr-fact"><span>${icon(ic, 18)}${label}</span><p>${esc(text)}</p></div>`;
+  return `
+    <div class="pr-brief">
+      <div class="pr-hero" style="background-image:url(${face(c, s.mood)})">
+        <button class="pr-round" data-act="practice-close" aria-label="뒤로">${icon("arrow-left", 20)}</button>
+        <div class="pr-nametag"><b>${esc(c.name)}</b><small>연인 · ${c.age}살</small></div>
+        <p class="pr-herosay">${esc(s.opening)}</p>
+      </div>
+      <div class="pr-briefbody">
+        <h3>이번에 할 일</h3>
+        <p class="pr-goal">${esc(s.goal)}</p>
+        <h3>지금 상황</h3>
+        ${row("message", "상황", s.scene)}
+        ${row("user", "내 역할", s.role)}
+        ${row("heart", "상대", `${c.name}, ${c.age}살 연인 · 지금 기분: ${MOOD_NAME[s.mood]}`)}
+        ${row("map-pin", "장소", s.place)}
+        <h3>이번 미션</h3>
+        <ul class="pr-missions">${missionRows()}</ul>
+      </div>
+      <div class="pr-briefcta"><button class="pr-yellow" data-act="practice-go">시작하기 ${icon("play", 18)}</button></div>
+    </div>`;
+}
+
+// ---------- 대화 ----------
 function talkHtml() {
-  const c = game.character, mine = lastAnswer();
-  const over = !!game.outcome;
+  const c = game.character, mine = lastAnswer(), over = !!game.outcome;
+  const turn = over ? answers() : answers() + 1;   // 끝난 뒤에는 실제로 답한 횟수
   return `
     <div class="pr-faces">${MOODS.map(m => `<i class="${m === game.mood ? "on" : ""}" style="background-image:url(${face(c, m)})"></i>`).join("")}</div>
-    <div class="pr-top">
-      <button class="pr-round" data-act="practice-exit" aria-label="대화 나가기">${icon("x", 20)}</button>
-      ${dotsHtml()}
-      ${game.grade ? `<span class="pr-grade g-${game.grade}" aria-label="지금 등급 ${game.grade}">${game.grade}</span>` : ""}
-      ${canSpeak ? `<button class="pr-round pr-sound${isMuted() ? " off" : ""}" data-act="practice-mute" aria-label="${isMuted() ? "음성 켜기" : "음성 끄기"}">${icon(isMuted() ? "volume-off" : "volume", 20)}</button>` : ""}
+    <div class="pr-hud">
+      <button class="pr-round" data-act="practice-exit" aria-label="대화 끝내기">${icon("x", 20)}</button>
+      <span class="pr-pill" aria-label="턴 ${turn} / ${MAX_ANSWERS}">턴 <b>${turn}</b> <small>/ ${MAX_ANSWERS}</small></span>
+      <span class="pr-pill pr-moodpill" aria-label="기분 ${moodLabel(game.score)}">기분 <span class="pr-gauge"><i style="width:${game.score}%"></i></span><b>${moodLabel(game.score)}</b></span>
     </div>
     <div class="pr-talk">
       ${mine ? `<p class="pr-mine">${esc(mine)}</p>` : ""}
-      ${game.sending
-        ? `<p class="pr-line pr-wait" role="status" aria-label="${esc(c.name)}의 답을 기다리는 중"><b>${esc(c.name)}</b><span class="pr-typing"><i></i><i></i><i></i></span></p>`
-        : `<p class="pr-line" aria-live="polite"><b>${esc(c.name)}</b>${esc(lastLine())}</p>`}
+      <div class="pr-dialog">
+        <b>${esc(c.name)}</b>
+        ${game.sending
+          ? `<p role="status" aria-label="${esc(c.name)}의 답을 기다리는 중"><span class="pr-typing"><i></i><i></i><i></i></span></p>`
+          : `<p aria-live="polite">${esc(lastLine())}</p>`}
+        ${canSpeak ? `<div class="pr-dialogtools">
+          <button data-act="practice-replay"${game.sending ? " disabled" : ""}>${icon("volume", 16)}듣기</button>
+          <button data-act="practice-mute" aria-pressed="${isMuted()}">${icon(isMuted() ? "volume-off" : "volume", 16)}${isMuted() ? "음성 꺼짐" : "음성 켜짐"}</button>
+        </div>` : ""}
+      </div>
       ${over ? `
-        <div class="pr-over">
-          <span class="pr-stamp g-${game.grade}">${game.grade}</span>
-          <div><b>${OUTCOME[game.outcome][0]}</b><small>${OUTCOME[game.outcome][1]}</small></div>
-        </div>
-        <button class="btn" data-act="practice-report">연애 대화 보고서 보기</button>`
+        <div class="pr-over"><span class="pr-stamp g-${game.grade}">${game.grade}</span><div><b>${OUTCOME[game.outcome][0]}</b><small>${OUTCOME[game.outcome][1]}</small></div></div>
+        <button class="pr-yellow" data-act="practice-report">연애 대화 보고서 보기</button>`
       : `
-        <div class="pr-chips">${game.suggestions.map((s, i) => `<button class="pr-chip" data-act="practice-suggest:${i}"${game.sending ? " disabled" : ""}>${esc(s)}</button>`).join("")}</div>
+        <button class="pr-missionchip" data-act="practice-missions">미션 ${game.done.length}/${game.situation.missions.length}, 목표와 조건 보기</button>
+        ${game.showTips ? `<div class="pr-chips">${game.suggestions.map((s, i) => `<button class="pr-chip" data-act="practice-suggest:${i}"${game.sending ? " disabled" : ""}>${esc(s)}</button>`).join("")}</div>` : ""}
         <div class="pr-compose">
-          <input class="pr-input" aria-label="내 답 쓰기" placeholder="내 답을 직접 써 보세요" maxlength="200" enterkeyhint="send" value="${esc(game.draft)}"${game.sending ? " disabled" : ""}>
-          <button class="pr-send" data-act="practice-send" aria-label="보내기"${game.sending ? " disabled" : ""}>${icon("arrow-up", 20)}</button>
+          <button class="pr-tool${game.showTips ? " on" : ""}" data-act="practice-tips" aria-expanded="${game.showTips}" aria-label="추천 답 보기">${icon("sparkle", 22)}</button>
+          <input class="pr-input" aria-label="내 답 쓰기" placeholder="내 답을 입력하세요" maxlength="200" enterkeyhint="send" value="${esc(game.draft)}"${game.sending ? " disabled" : ""}>
+          <button class="pr-send" data-act="practice-send" aria-label="보내기"${game.sending ? " disabled" : ""}>${icon("arrow-up", 22)}</button>
         </div>`}
     </div>`;
 }
@@ -97,23 +156,26 @@ function reportHtml() {
       <span class="pr-stamp big g-${game.grade}">${game.grade}</span>
       <h2>연애 대화 보고서</h2>
       <p>${esc(game.situation.title)} · ${esc(game.character.name)} · 답 ${answers()}번</p>
-    </div>`;
-  if (game.reportError) return `${head}<div class="pr-rstate"><p>보고서를 만들지 못했어요</p><button class="btn" data-act="practice-report">다시 시도</button></div>`;
-  if (!r) return `${head}<div class="pr-rstate" role="status"><span class="pr-typing dark"><i></i><i></i><i></i></span><p>대화를 돌아보는 중이에요</p></div>`;
+    </div>
+    <section class="pr-card"><h3>미션 ${game.done.length}/${game.situation.missions.length}</h3><ul class="pr-missions">${missionRows(game.done)}</ul></section>`;
+  if (game.reportError) return `${head}<div class="pr-rstate"><p>보고서를 만들지 못했어요</p><button class="pr-yellow" data-act="practice-report">다시 시도</button></div>`;
+  if (!r) return `${head}<div class="pr-rstate" role="status"><span class="pr-typing"><i></i><i></i><i></i></span><p>대화를 돌아보는 중이에요</p></div>`;
   return `${head}
     <section class="pr-card"><h3>왜 이 등급일까요</h3><p>${esc(r.summary)}</p></section>
     ${r.good.length ? `<section class="pr-card"><h3>좋은 답</h3>${r.good.map(g => `<blockquote>${esc(g.quote)}</blockquote><p>${esc(g.why)}</p>`).join("")}</section>` : ""}
     ${r.bad.length ? `<section class="pr-card"><h3>아쉬운 답과 더 나은 답</h3>${r.bad.map(b => `<blockquote>${esc(b.quote)}</blockquote><p>${esc(b.why)}</p><p class="pr-better"><b>이렇게 말해 보세요</b>${esc(b.better)}</p>`).join("")}</section>` : ""}
     <div class="pr-actions">
-      <button class="btn" data-act="practice-again">같은 상황 다시 하기</button>
-      <button class="btn line" data-act="practice-close">다른 상황 보기</button>
+      <button class="pr-yellow" data-act="practice-again">같은 상황 다시 하기</button>
+      <button class="pr-plain" data-act="practice-close">다른 상황 보기</button>
     </div>`;
 }
 
+const VIEWS = { brief: briefHtml, talk: talkHtml, report: () => `<div class="pr-report">${reportHtml()}</div>` };
+
 registerOverlay("practice", {
   active: () => !!game,
-  className: () => `pr-mode ${game.view === "report" ? "report" : "talk"}`,
-  html: () => (game.view === "report" ? `<div class="pr-report">${reportHtml()}</div>` : talkHtml()),
+  className: () => `pr-mode v-${game.view}`,
+  html: () => VIEWS[game.view](),
   mount(el) {
     const input = el.querySelector(".pr-input");
     if (!input) return;
@@ -125,11 +187,9 @@ registerOverlay("practice", {
   unmount() { stopSpeech(); },
 });
 
-function begin(situation, character) {
-  game = { situation, character, turns: [{ from: "them", text: situation.opening }], mood: situation.mood, grade: null,
-    suggestions: situation.suggestions, sending: false, outcome: null, report: null, reportError: false, draft: "", view: "talk" };
-  unlockSpeech();
-  speak(situation.opening, character.gender);
+function setup(situation, character) {
+  game = { situation, character, view: "brief", turns: [{ from: "them", text: situation.opening }], mood: situation.mood, score: situation.startScore, done: [],
+    grade: null, suggestions: situation.suggestions, showTips: false, sending: false, outcome: null, report: null, reportError: false, draft: "" };
 }
 
 async function send(raw) {
@@ -137,14 +197,14 @@ async function send(raw) {
   if (!text || !game || game.sending || game.outcome) return;
   const g = game;
   g.turns.push({ from: "me", text });
-  g.draft = ""; g.sending = true;
+  g.draft = ""; g.sending = true; g.showTips = false;
   stopSpeech();
   render();
   try {
-    const res = await api("/api/practice", { situationId: g.situation.id, characterId: g.character.id, me: { name: state.me.name }, turns: g.turns });
+    const res = await api("/api/practice", { situationId: g.situation.id, characterId: g.character.id, me: { name: state.me.name }, turns: g.turns, done: g.done });
     if (game !== g) return;    // 기다리는 사이 나갔다
     g.turns.push({ from: "them", text: res.reply });
-    Object.assign(g, { mood: res.mood, grade: res.grade, suggestions: res.suggestions.slice(0, 3), outcome: outcomeOf(res.grade, answers()) });
+    Object.assign(g, { mood: res.mood, score: res.moodScore, done: res.missionsDone, grade: res.grade, suggestions: res.suggestions.slice(0, 3), outcome: outcomeOf(res.grade, answers()) });
     speak(res.reply, g.character.gender);
     if (g.outcome) loadReport(g);
   } catch {
@@ -173,10 +233,26 @@ async function loadReport(g) {
 function close() { game = null; stopSpeech(); render(); }
 
 registerActions({
-  "practice-start"(arg) {
-    const { situation, character } = slidesFor(state.me.gender)[+arg];
-    begin(situation, character);
+  "practice-open"(id) {
+    const { situation, character } = slides().find(x => x.situation.id === id);
+    setup(situation, character);
     pushRoute("practice", close);
+  },
+  "practice-topic"(arg) {
+    topic = arg;
+    const root = document.querySelector("#screen");
+    root.querySelectorAll(".pr-topics button").forEach(b => {
+      const on = b.textContent === topic;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-selected", on);
+    });
+    root.querySelector(".pr-list").innerHTML = listHtml();
+    return false;
+  },
+  "practice-go"() {
+    game.view = "talk";
+    unlockSpeech();
+    speak(game.situation.opening, game.character.gender);
   },
   "practice-send"() {
     send(document.querySelector(".pr-input")?.value ?? "");
@@ -186,9 +262,19 @@ registerActions({
     send(game.suggestions[+arg]);
     return false;
   },
-  "practice-mute"() {
-    setMuted(!isMuted());
-    if (!isMuted() && !game.sending) speak(lastLine(), game.character.gender);
+  "practice-tips"() { game.showTips = !game.showTips; },
+  "practice-replay"() {
+    if (isMuted()) setMuted(false);
+    speak(lastLine(), game.character.gender);
+  },
+  "practice-mute"() { setMuted(!isMuted()); },
+  "practice-missions"() {
+    openSheet({
+      title: "목표와 미션",
+      body: `<p class="pr-sheetgoal">${esc(game.situation.goal)}</p><ul class="pr-missions">${missionRows(game.done)}</ul>`,
+      actions: [], cancel: "확인",
+    });
+    return false;
   },
   "practice-report"() {
     game.view = "report";
@@ -196,17 +282,17 @@ registerActions({
     if (!game.report && !game.loading) loadReport(game);
   },
   "practice-again"() {
-    begin(game.situation, game.character);
+    setup(game.situation, game.character);
   },
   "practice-close"() { backRoute(); return false; },
   "practice-exit"() {
     if (game.outcome || !answers()) { backRoute(); return false; }
     openSheet({
-      title: "대화를 그만할까요?", body: "지금까지의 대화는 저장되지 않아요",
-      actions: [{ label: "그만하기", danger: true, onTap: () => close() }], cancel: "계속하기",
+      title: "대화를 끝낼까요?", body: "지금까지의 대화는 저장되지 않아요",
+      actions: [{ label: "끝내기", danger: true, onTap: () => close() }], cancel: "계속하기",
     });
     return false;
   },
 });
 
-registerReset(() => { game = null; feedTop = 0; });
+registerReset(() => { game = null; topic = "전체"; query = ""; });
