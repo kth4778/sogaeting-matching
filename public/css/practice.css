@@ -71,7 +71,7 @@
 /* 대화 */
 .overlay.pr-mode.v-talk { overflow: hidden; background: var(--gray-900); color: #fff; }
 .pr-faces { position: absolute; inset: 0; }
-.pr-faces i { position: absolute; inset: 0; background: center 8% / cover; opacity: 0; transition: opacity 500ms var(--e-out); }
+.pr-faces i { position: absolute; inset: 0; background: center 20% / cover; opacity: 0; transition: opacity 500ms var(--e-out); }
 .pr-faces i.on { opacity: 1; }
 .pr-faces::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0, 0, 0, .4) 0, rgba(0, 0, 0, 0) 18%, rgba(0, 0, 0, 0) 58%, rgba(0, 0, 0, .9) 82%); }
 .pr-hud { position: absolute; left: var(--gutter-float); right: var(--gutter-float); top: 58px; display: flex; align-items: center; gap: var(--sp-2); }
