@@ -61,7 +61,7 @@ function render() {
     overlay.innerHTML = "";
   }
   lastOverlay = cur;
-  $(".phone-screen").classList.toggle("on-photo", !!state.detail || state.tab === "practice");
+  $(".phone-screen").classList.toggle("on-photo", !!state.detail);
 
   // 닫힌 오버레이·대화방의 뒤로가기 항목을 뺀다 (스택에 없으면 아무것도 안 한다)
   for (const [name, o] of overlays) if (!o.active()) dropRoute(name);
