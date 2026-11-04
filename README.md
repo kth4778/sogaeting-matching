@@ -30,7 +30,11 @@
 - 화면 위쪽에 턴과 상대 기분 게이지가, 카드에 대사가 나온다. 대사는 자막과 브라우저 내장 음성(`speechSynthesis`)으로 나온다. 음성은 기기마다 다르고, 한국어 음성이 없으면 자막만 보인다.
 - 답할 때마다 대화 전체 흐름으로 S~F 등급을 다시 매긴다(`POST /api/practice`). S(답 3개 이상, 필수 미션 달성)나 F가 나오면 바로 끝나고, 아니면 10번째 답에서 끝난다.
 - 끝나면 연애 대화 보고서(미션 결과, 종합 등급과 이유, 좋은 답, 아쉬운 답과 더 나은 답)를 보여 준다(`POST /api/practice-report`).
-- 상황·캐릭터는 `public/js/data/practice.js`, 규칙은 `public/js/core/practice.js`, 표정 그림은 `public/photos/practice/`, 상황 장면 그림은 `public/photos/practice/scenes/`에 있다.
+- 상황·캐릭터는 `public/js/data/practice.js`, 규칙은 `public/js/core/practice.js`, 장면 그림은 상황·상대·표정별로 `public/photos/practice/scenes/`에 있다.
+
+## 발표 모드
+
+PC 화면에서 내 정보 맨 아래 「발표 모드」를 누르면 폰이 두 대가 된다. 왼쪽은 그대로 조작하는 앱, 오른쪽은 서비스 설명 영상(약 74초 무한 반복)이다. 영상은 `public/js/features/present.js`가 실제 화면 캡처(`public/demo/`) 위에 카메라·손가락·입력·자막·마스코트를 시간 하나로 계산해 그린다. Esc나 오른쪽 위 버튼으로 끝낸다.
 
 ## 로고와 모션
 

@@ -4,7 +4,7 @@ import { esc } from "../core/util.js";
 import { state, load, save, registerReset } from "../core/store.js";
 import { registerScreen, registerOverlay, registerActions, render, pushRoute, backRoute } from "../core/runtime.js";
 import { api } from "../core/matching.js";
-import { MAX_ANSWERS, slidesFor, outcomeOf, moodLabel } from "../core/practice.js";
+import { MAX_ANSWERS, slidesFor, outcomeOf, moodLabel, sceneImage } from "../core/practice.js";
 import { MOODS } from "../data/practice.js";
 import { icon } from "../ui/icons.js";
 import { toast } from "../ui/toast.js";
@@ -17,8 +17,6 @@ const OUTCOME = {
   limit: ["기회를 다 썼어요", "여기까지의 대화를 정리했어요"],
 };
 const MOOD_NAME = { calm: "평온", happy: "기쁨", hurt: "서운함", angry: "화남", moved: "감동" };
-const face = (c, mood) => `photos/practice/${c.id}-${mood}.jpg`;
-const scene = (s, c) => `photos/practice/scenes/${s.id}-${c.id}.jpg`;
 
 let game = null;       // { situation, character, view, turns, mood, score, done, grade, suggestions, showTips, sending, outcome, report, reportError, draft }
 let topic = "전체";
@@ -39,7 +37,7 @@ function slideHtml({ situation: s, character: c }) {
   const on = saved.includes(s.id);
   return `
     <section class="pr-slide">
-      <i class="pr-photo" style="background-image:url(${scene(s, c)})"></i>
+      <i class="pr-photo" style="background-image:url(${sceneImage(s, c)})"></i>
       <div class="pr-bubble">
         <b>${esc(c.name)}</b>
         <p>${esc(s.opening)}</p>
@@ -101,7 +99,7 @@ function briefHtml() {
   const row = (ic, label, text) => `<div class="pr-fact"><span>${icon(ic, 18)}${label}</span><p>${esc(text)}</p></div>`;
   return `
     <div class="pr-brief">
-      <div class="pr-hero" style="background-image:url(${scene(s, c)})">
+      <div class="pr-hero" style="background-image:url(${sceneImage(s, c)})">
         <button class="pr-round" data-act="practice-close" aria-label="뒤로">${icon("arrow-left", 20)}</button>
         <div class="pr-nametag"><b>${esc(c.name)}</b><small>연인 · ${c.age}살</small></div>
         <p class="pr-herosay">${esc(s.opening)}</p>
@@ -126,7 +124,7 @@ function talkHtml() {
   const c = game.character, mine = lastAnswer(), over = !!game.outcome;
   const turn = over ? answers() : answers() + 1;   // 끝난 뒤에는 실제로 답한 횟수
   return `
-    <div class="pr-faces">${MOODS.map(m => `<i class="${m === game.mood ? "on" : ""}" style="background-image:url(${face(c, m)})"></i>`).join("")}</div>
+    <div class="pr-faces">${MOODS.map(m => `<i class="${m === game.mood ? "on" : ""}" style="background-image:url(${sceneImage(game.situation, c, m)})"></i>`).join("")}</div>
     <div class="pr-hud">
       <button class="pr-round" data-act="practice-exit" aria-label="대화 끝내기">${icon("x", 20)}</button>
       <span class="pr-pill" aria-label="턴 ${turn} / ${MAX_ANSWERS}">턴 <b>${turn}</b> <small>/ ${MAX_ANSWERS}</small></span>

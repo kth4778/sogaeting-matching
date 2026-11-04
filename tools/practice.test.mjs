@@ -1,9 +1,10 @@
 // 연애 연습 게임 규칙·질문지 테스트 — node --test tools/practice.test.mjs
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_ANSWERS, slidesFor, settleGrade, outcomeOf, moodLabel, requiredDone } from "../public/js/core/practice.js";
+import { MAX_ANSWERS, slidesFor, settleGrade, outcomeOf, moodLabel, requiredDone, sceneImage } from "../public/js/core/practice.js";
 import { SITUATIONS, CHARACTERS, MOODS } from "../public/js/data/practice.js";
 import { ROUTES } from "../llm.js";
+import { existsSync } from "node:fs";
 
 test("상대: 남자 프로필이면 여성, 여자 프로필이면 남성 캐릭터만 나온다", () => {
   assert.ok(slidesFor("남").every(s => s.character.gender === "여"));
@@ -53,6 +54,15 @@ test("끝나는 조건: S·F는 바로, 그 밖에는 10번째 답에서", () =>
   assert.equal(outcomeOf("A", MAX_ANSWERS - 1), null);
   assert.equal(outcomeOf("A", MAX_ANSWERS), "limit");
   assert.equal(outcomeOf("D", MAX_ANSWERS), "limit");
+});
+
+test("그림: 상황마다 양쪽 상대의 장면 그림이 표정 5종씩 모두 있다", () => {
+  const missing = [];
+  for (const g of ["남", "여"]) for (const { situation: s, character: c } of slidesFor(g)) for (const m of MOODS) {
+    const f = `public/${sceneImage(s, c, m)}`;
+    if (!existsSync(f)) missing.push(f);
+  }
+  assert.deepEqual(missing, []);
 });
 
 const fakeRun = output => {
