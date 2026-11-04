@@ -1,7 +1,7 @@
-// 연애 연습 탭: 탐색(검색·오늘의 도전·주제·목록) → 대화 전 안내(할 일·상황·미션) → 대화(턴·기분·미션, 최대 10번) → 연애 대화 보고서
-// 탐색은 탭 화면, 나머지는 탭바를 가리는 오버레이다. 오버레이는 game 값만으로 다시 그릴 수 있다.
+// 연애 연습 탭: 쇼츠 피드(위아래로 넘겨 상황 고르기) → 대화 전 안내(할 일·상황·미션) → 대화(턴·기분·미션, 최대 10번) → 연애 대화 보고서
+// 피드는 탭 화면, 나머지는 탭바를 가리는 오버레이다. 오버레이는 game 값만으로 다시 그릴 수 있다.
 import { esc } from "../core/util.js";
-import { state, registerReset } from "../core/store.js";
+import { state, load, save, registerReset } from "../core/store.js";
 import { registerScreen, registerOverlay, registerActions, render, pushRoute, backRoute } from "../core/runtime.js";
 import { api } from "../core/matching.js";
 import { MAX_ANSWERS, slidesFor, outcomeOf, moodLabel } from "../core/practice.js";
@@ -18,66 +18,76 @@ const OUTCOME = {
 };
 const MOOD_NAME = { calm: "평온", happy: "기쁨", hurt: "서운함", angry: "화남", moved: "감동" };
 const face = (c, mood) => `photos/practice/${c.id}-${mood}.jpg`;
+const scene = (s, c) => `photos/practice/scenes/${s.id}-${c.id}.jpg`;
 
 let game = null;       // { situation, character, view, turns, mood, score, done, grade, suggestions, showTips, sending, outcome, report, reportError, draft }
 let topic = "전체";
-let query = "";
+let feedTop = 0;       // 다른 탭에 다녀와도 보던 상황에서 이어 간다
+let saved = load("practice-saved", []);
+const SAVED = "저장";
 
 const answers = () => game.turns.filter(t => t.from === "me").length;
 const lastLine = () => game.turns.findLast(t => t.from === "them").text;
 const lastAnswer = () => game.turns.findLast(t => t.from === "me")?.text;
 const slides = () => slidesFor(state.me.gender);
-// 오늘의 도전은 날짜로 정한다: 하루 동안 같은 상황이 나온다
-const todayIndex = () => Math.floor(Date.now() / 86_400_000) % slides().length;
+const slideOf = id => slides().find(x => x.situation.id === id);
 
-// ---------- 탐색 ----------
-function rowHtml({ situation: s, character: c }, n) {
+// ---------- 쇼츠 피드 ----------
+const visible = () => slides().filter(({ situation: s }) => (topic === "전체" ? true : topic === SAVED ? saved.includes(s.id) : s.topic === topic));
+
+function slideHtml({ situation: s, character: c }) {
+  const on = saved.includes(s.id);
   return `
-    <button class="pr-row" data-act="practice-open:${s.id}">
-      <span class="pr-rank">${n}</span>
-      <i class="pr-thumb" style="background-image:url(${face(c, s.mood)})"></i>
-      <span class="pr-rowtext"><b>${esc(s.title)}</b><small>${esc(s.topic)} · ${esc(c.name)}, ${c.age}</small></span>
-    </button>`;
+    <section class="pr-slide">
+      <i class="pr-photo" style="background-image:url(${scene(s, c)})"></i>
+      <div class="pr-bubble">
+        <b>${esc(c.name)}</b>
+        <p>${esc(s.opening)}</p>
+        ${canSpeak ? `<button class="pr-listen" data-act="practice-listen:${s.id}">${icon("volume", 14)}탭해서 듣기</button>` : ""}
+      </div>
+      <div class="pr-info">
+        <h2>${esc(s.title)}</h2>
+        <p class="pr-tag">#${esc(s.topic)}</p>
+        <p class="pr-mission">${icon("target", 20)}<span>${esc(s.goal)}</span></p>
+        <div class="pr-cta">
+          <button class="pr-heart${on ? " on" : ""}" data-act="practice-save:${s.id}" aria-pressed="${on}" aria-label="상황 저장">${icon(on ? "heart-fill" : "heart", 24)}</button>
+          <button class="pr-yellow" data-act="practice-open:${s.id}">플레이하기 ${icon("play", 18)}</button>
+        </div>
+      </div>
+    </section>`;
 }
 
-function listHtml() {
-  const q = query.trim();
-  const list = slides().filter(({ situation: s, character: c }) => (topic === "전체" || s.topic === topic)
-    && (!q || `${s.title} ${s.scene} ${s.topic} ${c.name}`.includes(q)));
-  return list.length ? list.map((x, i) => rowHtml(x, i + 1)).join("") : `<p class="pr-empty">찾는 상황이 없어요</p>`;
-}
+const feedHtml = () => visible().map(slideHtml).join("") || `<section class="pr-slide pr-none"><p>저장한 상황이 없어요<br>마음에 드는 상황에서 하트를 눌러 보세요</p></section>`;
+const soundIcon = () => icon(isMuted() ? "volume-off" : "volume", 20);
 
-function exploreHtml() {
-  const today = slides()[todayIndex()];
-  const topics = ["전체", ...new Set(slides().map(x => x.situation.topic))];
+function shellHtml() {
+  const topics = ["전체", ...new Set(slides().map(x => x.situation.topic)), SAVED];
   return `
-    <div class="pr-explore">
-      <h1 class="pr-title">연애 연습</h1>
-      <label class="pr-search"><span>${icon("search", 20)}</span><input class="pr-q" type="search" placeholder="상황 검색" aria-label="상황 검색" value="${esc(query)}"></label>
-      <button class="pr-today" data-act="practice-open:${today.situation.id}">
-        <span class="pr-todaytext">
-          <small><i></i>오늘의 도전</small>
-          <b>${esc(today.situation.title)}</b>
-          <span>상황 보기 ${icon("chevron-right", 16)}</span>
-        </span>
-        <i class="pr-todayface" style="background-image:url(${face(today.character, today.situation.mood)})"></i>
-      </button>
-      <div class="pr-topics" role="tablist">${topics.map(t => `<button role="tab" aria-selected="${t === topic}" class="${t === topic ? "on" : ""}" data-act="practice-topic:${esc(t)}">${esc(t)}</button>`).join("")}</div>
-      <h2 class="pr-h2">이런 상황, 어떻게 말할까요?</h2>
-      <div class="pr-list">${listHtml()}</div>
+    <div class="pr-shell">
+      <div class="pr-feedtop">
+        <h1>연애 연습</h1>
+        ${canSpeak ? `<button class="pr-round pr-feedsound" data-act="practice-mute" aria-label="상대 음성 끄기" aria-pressed="${isMuted()}">${soundIcon()}</button>` : ""}
+        <div class="pr-topics" role="tablist">${topics.map(t => `<button role="tab" aria-selected="${t === topic}" class="${t === topic ? "on" : ""}" data-act="practice-topic:${esc(t)}">${esc(t)}</button>`).join("")}</div>
+      </div>
+      <div class="pr-feed">${feedHtml()}</div>
     </div>`;
 }
 
 registerScreen("practice", {
-  html: exploreHtml,
+  html: shellHtml,
   mount(root) {
-    root.classList.add("pr-screen");
-    root.querySelector(".pr-q").addEventListener("input", e => {
-      query = e.target.value;
-      root.querySelector(".pr-list").innerHTML = listHtml();
-    });
+    root.classList.add("no-scroll", "pr-screen");
+    const feed = root.querySelector(".pr-feed");
+    feed.scrollTop = feedTop;
+    let slide = Math.round(feedTop / (feed.clientHeight || 1));
+    feed.addEventListener("scroll", () => {
+      feedTop = feed.scrollTop;
+      const now = Math.round(feedTop / (feed.clientHeight || 1));
+      if (now !== slide) { slide = now; stopSpeech(); }   // 다음 상황으로 넘기면 읽던 대사를 멈춘다
+    }, { passive: true });
   },
-  patch: () => true,   // 다른 화면 때문에 다시 그려도 입력과 스크롤을 그대로 둔다
+  unmount() { stopSpeech(); },
+  patch: () => true,   // 다른 화면 때문에 다시 그려도 피드 위치를 그대로 둔다
 });
 
 // ---------- 대화 전 안내 ----------
@@ -91,7 +101,7 @@ function briefHtml() {
   const row = (ic, label, text) => `<div class="pr-fact"><span>${icon(ic, 18)}${label}</span><p>${esc(text)}</p></div>`;
   return `
     <div class="pr-brief">
-      <div class="pr-hero" style="background-image:url(${face(c, s.mood)})">
+      <div class="pr-hero" style="background-image:url(${scene(s, c)})">
         <button class="pr-round" data-act="practice-close" aria-label="뒤로">${icon("arrow-left", 20)}</button>
         <div class="pr-nametag"><b>${esc(c.name)}</b><small>연인 · ${c.age}살</small></div>
         <p class="pr-herosay">${esc(s.opening)}</p>
@@ -232,21 +242,48 @@ async function loadReport(g) {
 
 function close() { game = null; stopSpeech(); render(); }
 
+function paintFeedSound() {
+  const b = document.querySelector(".pr-feedsound");
+  if (!b) return;
+  b.innerHTML = soundIcon();
+  b.setAttribute("aria-pressed", isMuted());
+}
+
 registerActions({
   "practice-open"(id) {
-    const { situation, character } = slides().find(x => x.situation.id === id);
+    const { situation, character } = slideOf(id);
+    stopSpeech();
     setup(situation, character);
     pushRoute("practice", close);
   },
   "practice-topic"(arg) {
-    topic = arg;
+    topic = arg; feedTop = 0;
+    stopSpeech();
     const root = document.querySelector("#screen");
     root.querySelectorAll(".pr-topics button").forEach(b => {
       const on = b.textContent === topic;
       b.classList.toggle("on", on);
       b.setAttribute("aria-selected", on);
     });
-    root.querySelector(".pr-list").innerHTML = listHtml();
+    const feed = root.querySelector(".pr-feed");
+    feed.innerHTML = feedHtml();
+    feed.scrollTop = 0;
+    return false;
+  },
+  "practice-listen"(id) {
+    const { situation, character } = slideOf(id);
+    if (isMuted()) { setMuted(false); paintFeedSound(); }
+    unlockSpeech();
+    speak(situation.opening, character.gender);
+    return false;
+  },
+  "practice-save"(id, el) {
+    saved = saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id];
+    save("practice-saved", saved);
+    const on = saved.includes(id);
+    el.classList.toggle("on", on);
+    el.setAttribute("aria-pressed", on);
+    el.innerHTML = icon(on ? "heart-fill" : "heart", 24);
     return false;
   },
   "practice-go"() {
@@ -267,7 +304,11 @@ registerActions({
     if (isMuted()) setMuted(false);
     speak(lastLine(), game.character.gender);
   },
-  "practice-mute"() { setMuted(!isMuted()); },
+  "practice-mute"() {
+    setMuted(!isMuted());
+    paintFeedSound();
+    return !game ? false : undefined;   // 피드는 다시 그리지 않고, 대화 화면만 다시 그린다
+  },
   "practice-missions"() {
     openSheet({
       title: "목표와 미션",
@@ -295,4 +336,4 @@ registerActions({
   },
 });
 
-registerReset(() => { game = null; topic = "전체"; query = ""; });
+registerReset(() => { game = null; topic = "전체"; feedTop = 0; saved = []; });
