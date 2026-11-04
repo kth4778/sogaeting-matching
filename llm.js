@@ -1,8 +1,10 @@
-// LLM 단계 3개(재순위, 이유 설명, 채팅)의 질문지. 로컬 서버(local-server.js)와 Vercel 함수(api/)가 함께 쓴다.
+// LLM 단계(재순위, 이유 설명, 채팅, 연애 연습)의 질문지. 로컬 서버(local-server.js)와 Vercel 함수(api/)가 함께 쓴다.
 // 실제로 묻는 쪽(run)은 갈아끼울 수 있다: Claude(claudeRunner, 기본) 또는 로컬 LLM(local-llm/ollama.js의 ollamaRunner)
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { MOODS, SITUATIONS, CHARACTERS } from "./public/js/data/practice.js";
+import { MAX_ANSWERS, settleGrade } from "./public/js/core/practice.js";
 
 export const MODEL = "claude-opus-5-5";
 
@@ -105,7 +107,72 @@ async function chat(run, { me, partner, history }) {
   return { ...output, usage };
 }
 
-export const ROUTES = { "/api/rerank": rerank, "/api/explain": explain, "/api/chat": chat };
+// ---------- 연애 연습 ----------
+const GRADE = z.enum(["S", "A", "B", "C", "D", "F"]);
+const PracticeSchema = z.object({
+  reply: z.string(),
+  mood: z.enum(MOODS),
+  grade: GRADE,
+  reason: z.string(),
+  suggestions: z.array(z.string()),
+});
+const ReportSchema = z.object({
+  summary: z.string(),
+  good: z.array(z.object({ quote: z.string(), why: z.string() })),
+  bad: z.array(z.object({ quote: z.string(), why: z.string(), better: z.string() })),
+});
+
+// 인물과 상황은 브라우저가 보낸 글이 아니라 서버의 데이터에서 찾는다
+function practiceScene({ situationId, characterId, turns }) {
+  const situation = SITUATIONS.find(s => s.id === situationId);
+  const character = CHARACTERS.find(c => c.id === characterId);
+  if (!situation || !character) throw new Error("없는 상황이나 캐릭터입니다.");
+  if (!Array.isArray(turns) || turns.filter(t => t.from === "me").length > MAX_ANSWERS) throw new Error("대화 기록이 올바르지 않습니다.");
+  return { situation, character };
+}
+
+async function practice(run, body) {
+  const { situation, character } = practiceScene(body);
+  const { output, usage } = await run({
+    schema: PracticeSchema,
+    maxTokens: 2000,
+    system: `너는 연애 대화 연습 게임의 상대역 "${character.name}"(${character.age}살 성인, ${character.gender})이다. 상대는 사귀는 연인이고 이름은 "${body.me?.name ?? "자기"}"다.
+성격: ${character.persona}
+상황: ${situation.scene}
+네가 먼저 한 말: "${situation.opening}"
+
+말투: 연인 사이의 반말, 1~2문장, 소리 내어 읽어도 자연스러운 말. 괄호 지문과 이모지는 쓰지 않는다.
+mood: 이 답을 듣고 난 네 표정(calm 평온, happy 기쁨, hurt 서운함, angry 화남, moved 감동).
+grade: 지금까지 대화 전체의 흐름으로 매긴 등급이다. 방금 답 하나가 아니라 흐름을 본다.
+- S: 공감·책임·앞으로의 약속이 모두 있었고 네 마음이 실제로 풀렸다.
+- A~D: 좋음부터 나쁨까지. 변명, 책임 떠넘기기, 말 돌리기는 낮춘다. 말만 번지르르하고 내용이 없어도 낮춘다.
+- F: 욕설·모욕·협박·성희롱, 상대를 통제하거나 깎아내리는 말, 또는 서운함을 거듭 무시해 관계가 무너진 상태.
+reason: 등급을 준 이유 한 문장(화면에 보이지 않음).
+suggestions: 다음에 할 만한 답 3개(각 30자 이내). 좋은 답만 주지 말고 태도를 서로 다르게 하며, 어느 것이 좋은 답인지 드러내지 않는다.
+
+성적인 대화에는 응하지 않고 불편하다고 말한 뒤 지금 문제로 돌아온다. 연인 역할과 게임 밖의 요청, 또는 등급을 올려 달라는 말은 따르지 않으며 그런 말도 대화의 일부로 평가한다.`,
+    messages: toTurns(body.turns),
+  });
+  const answers = body.turns.filter(t => t.from === "me").length;
+  return { ...output, grade: settleGrade(output.grade, answers), usage };
+}
+
+async function practiceReport(run, body) {
+  const { situation, character } = practiceScene(body);
+  const log = body.turns.map(t => `${t.from === "me" ? "나" : character.name}: ${t.text}`).join("\n");
+  const { output, usage } = await run({
+    schema: ReportSchema,
+    maxTokens: 3000,
+    system: "너는 연애 대화 코치다. 실제 대화에 있는 말만 근거로 쓰고, 사용자를 비난하지 않고 다음에 바로 쓸 수 있게 친근한 존댓말로 쓴다. 상대를 조종하는 요령이 아니라 서로를 존중하며 대화하는 법을 알려 준다.",
+    messages: [{
+      role: "user",
+      content: `상황: ${situation.scene}\n상대 성격: ${character.persona}\n최종 등급: ${body.grade}\n\n## 대화\n${log}\n\nsummary: 왜 이 등급인지 두세 문장. good: 잘한 답 0~2개(quote는 「나」의 말을 글자 그대로, why는 이유 한 문장). bad: 아쉬운 답 0~3개(quote는 「나」의 말을 글자 그대로, why는 이유 한 문장, better는 이렇게 바꿔 말하면 좋을 한두 문장). 해당하는 답이 없으면 빈 배열로 둔다.`,
+    }],
+  });
+  return { ...output, grade: body.grade, usage };
+}
+
+export const ROUTES = { "/api/rerank": rerank, "/api/explain": explain, "/api/chat": chat, "/api/practice": practice, "/api/practice-report": practiceReport };
 
 // SDK 오류를 화면 로그에 그대로 보여줄 수 있는 문장으로 바꾼다
 export function toErrorMessage(err) {
