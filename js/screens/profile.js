@@ -8,6 +8,7 @@ import { toast } from "../ui/toast.js";
 import { REDUCE } from "../ui/motion.js";
 import { cardHtml } from "./cards.js";
 import { startOnboarding } from "./onboarding.js";
+import { canPresent, isPresenting } from "../features/present.js";
 
 const RING_R = 46;
 const RING_LEN = 2 * Math.PI * RING_R;
@@ -72,7 +73,8 @@ export function profileHtml() {
       <button class="list-row" data-act="me-terms"><span>약관·개인정보 처리방침</span>${icon("chevron-right", 16)}</button>
       <button class="list-row danger" data-act="reset"><span>체험 기록 지우기</span></button>
     </section>
-    <p class="me-foot">체험용 데모예요 · 입력한 정보는 이 기기에만 저장돼요</p>`;
+    <p class="me-foot">체험용 데모예요 · 입력한 정보는 이 기기에만 저장돼요</p>
+    ${canPresent() ? `<button class="btn line me-present" data-act="present-toggle">${isPresenting() ? "발표 모드 끝내기" : "발표 모드 (폰 두 대로 보기)"}</button>` : ""}`;
 }
 
 registerScreen("me", {

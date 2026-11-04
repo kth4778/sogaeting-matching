@@ -10,6 +10,9 @@ export function slidesFor(myGender) {
   return SITUATIONS.map((situation, i) => ({ situation, character: partners[i % partners.length] }));
 }
 
+// 장면 그림: 상황의 시작 표정은 기본 그림, 다른 표정은 같은 장면에서 표정만 바꾼 그림이다
+export const sceneImage = (s, c, mood = s.mood) => `photos/practice/scenes/${s.id}-${c.id}${mood === s.mood ? "" : `-${mood}`}.jpg`;
+
 export const moodLabel = score => (score < 20 ? "바닥" : score < 40 ? "나쁨" : score < 60 ? "보통" : score < 80 ? "좋음" : "최고");
 export const requiredDone = (missions, done) => missions.every((m, i) => !m.required || done.includes(i));
 
