@@ -6,6 +6,7 @@ import "./screens/home.js";
 import "./screens/cards.js";
 import "./screens/detail.js";
 import "./screens/chat.js";
+import "./screens/practice.js";
 import "./screens/profile.js";
 import { $ } from "./core/util.js";
 import { state } from "./core/store.js";
@@ -60,7 +61,7 @@ function render() {
     overlay.innerHTML = "";
   }
   lastOverlay = cur;
-  $(".phone-screen").classList.toggle("on-photo", !!state.detail);
+  $(".phone-screen").classList.toggle("on-photo", !!state.detail || state.tab === "practice");
 
   // 닫힌 오버레이·대화방의 뒤로가기 항목을 뺀다 (스택에 없으면 아무것도 안 한다)
   for (const [name, o] of overlays) if (!o.active()) dropRoute(name);

@@ -23,6 +23,15 @@
 
 앱 이름·아이콘·세로 고정은 `public/manifest.webmanifest`, 안내와 확대 막기는 `public/install.js`, 오프라인 화면은 `public/sw.js`(https 배포에서만 켜짐)에 있다.
 
+## 연애 연습 탭
+
+쇼츠처럼 위아래로 넘기며 연애 상황 8개 중 하나를 고르고, 게임 전용 캐릭터(남자 프로필이면 여성, 여자 프로필이면 남성, 각 3명)에게 최대 10번 답하는 게임이다. 매칭 점수와는 연결되지 않는다.
+
+- 상대의 대사는 자막과 브라우저 내장 음성(`speechSynthesis`)으로 나온다. 음성은 기기마다 다르고, 한국어 음성이 없으면 자막만 보인다.
+- 답할 때마다 대화 전체 흐름으로 S~F 등급을 다시 매긴다(`POST /api/practice`). S(답 3개 이상부터)나 F가 나오면 바로 끝나고, 아니면 10번째 답에서 끝난다.
+- 끝나면 연애 대화 보고서(종합 등급과 이유, 좋은 답, 아쉬운 답과 더 나은 답)를 보여 준다(`POST /api/practice-report`).
+- 상황·캐릭터는 `public/js/data/practice.js`, 규칙은 `public/js/core/practice.js`, 표정 사진은 `public/photos/practice/`에 있다.
+
 ## 로고와 모션
 
 로고는 「인연의 실」이다. 두 사람(두 점)을 고리 하나 있는 실 한 줄이 잇는다. 선 경로는 `public/js/ui/brand.js`의 `MARK_PATH` 하나이고, 앱 아이콘 PNG도 이 경로로 그렸다. 모양을 바꾸면 아이콘도 다시 만들고 `public/sw.js`의 캐시 이름을 올린다.
